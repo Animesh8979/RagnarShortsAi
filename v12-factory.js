@@ -16,7 +16,7 @@ const {generateAIImage} = require('./image-providers');
 const {requestAIVideo} = require('./video-providers');
 const {extractDepthMap} = require('./depth-mapper');
 const {isComfyUIRunning, generateAvatarMotionClip, getComfyUICapabilities} = require('./comfyui-bridge');
-const {synthesizeEdgeReadAloudToMp3, EDGE_HINDI_MALE_VOICE, splitTextAtBreaks} = require('./edge-readaloud');
+const {synthesizeEdgeReadAloudToMp3, EDGE_HINDI_MALE_VOICE, splitTextAtBreaks, selectHindiVoice, EDGE_HINDI_VOICE_POOL} = require('./edge-readaloud');
 const {generateFishAudio} = require('./src/providers/fish-audio');
 const {generateElevenLabsAudio} = require('./src/providers/elevenlabs');
 const {enhanceHindiForTTS} = require('./hindi-voice-enhancer');
@@ -75,12 +75,16 @@ const WHISPER_MODEL_CANDIDATES = Object.freeze([
     label: 'Whisper large-v3-turbo',
   },
   {
+    id: 'Xenova/whisper-small',
+    label: 'Whisper small (multilingual, Hindi+English)',
+  },
+  {
     id: 'onnx-community/whisper-small.en_timestamped',
-    label: 'Whisper small timestamped',
+    label: 'Whisper small timestamped (English)',
   },
   {
     id: 'Xenova/whisper-base.en',
-    label: 'Whisper base',
+    label: 'Whisper base (English)',
   },
 ]);
 const SCRIPT_PROVIDER = String(process.env.SCRIPT_PROVIDER || 'auto').toLowerCase();
@@ -146,9 +150,9 @@ const HOOK_TRAILING_CONNECTOR_WORDS = new Set([
 const HINDI_STORY_EDGE_ENABLED = /^(1|true|yes)$/i.test(String(process.env.HINDI_STORY_EDGE_ENABLED || ''));
 const HINDI_STORY_PRIMARY_ENGINE = String(process.env.HINDI_STORY_PRIMARY_ENGINE || 'edge').trim().toLowerCase();
 const HINDI_STORY_EDGE_VOICE = process.env.HINDI_STORY_EDGE_VOICE || EDGE_HINDI_MALE_VOICE;
-const HINDI_STORY_EDGE_RATE = process.env.HINDI_STORY_EDGE_RATE || '-6%';
-const HINDI_STORY_EDGE_PITCH = process.env.HINDI_STORY_EDGE_PITCH || '-6Hz';
-const HINDI_STORY_EDGE_VOLUME = process.env.HINDI_STORY_EDGE_VOLUME || '+0%';
+const HINDI_STORY_EDGE_RATE = process.env.HINDI_STORY_EDGE_RATE || '+2%';
+const HINDI_STORY_EDGE_PITCH = process.env.HINDI_STORY_EDGE_PITCH || '+0Hz';
+const HINDI_STORY_EDGE_VOLUME = process.env.HINDI_STORY_EDGE_VOLUME || '+10%';
 const HINDI_STORY_EDGE_TIMEOUT_MS = Math.max(5000, Number(process.env.HINDI_STORY_EDGE_TIMEOUT_MS || 25000));
 const DEFAULT_NEWS_NARRATOR_PROFILE = process.env.DEFAULT_NEWS_NARRATOR_PROFILE || 'news-desk-v1';
 const DEFAULT_HINDI_STORY_NARRATOR_PROFILE = process.env.DEFAULT_HINDI_STORY_NARRATOR_PROFILE || 'owned-story-calm-v2';
@@ -163,27 +167,40 @@ const NARRATOR_PROFILES = Object.freeze({
   },
   'owned-story-narrator-v1': {
     id: 'owned-story-narrator-v1',
-    edgeVoice: HINDI_STORY_EDGE_VOICE,
-    edgeRate: HINDI_STORY_EDGE_RATE,
-    edgePitch: HINDI_STORY_EDGE_PITCH,
-    edgeVolume: HINDI_STORY_EDGE_VOLUME,
+    edgeVoice: 'hi-IN-MadhurNeural',
+    edgeRate: '+3%',
+    edgePitch: '+1Hz',
+    edgeVolume: '+12%',
     masterPreset: 'story_male',
     fallbackSourceLabel: 'google-tts-api:hi-deep-enhanced',
-    interScenePauseMs: 280,
-    dramaticPauseMs: 520,
+    interScenePauseMs: 220,
+    dramaticPauseMs: 400,
   },
   'owned-story-calm-v2': {
     id: 'owned-story-calm-v2',
-    edgeVoice: HINDI_STORY_EDGE_VOICE,
-    edgeRate: process.env.HINDI_STORY_CALM_EDGE_RATE || '+1%',
-    edgePitch: process.env.HINDI_STORY_CALM_EDGE_PITCH || '+4Hz',
-    edgeVolume: process.env.HINDI_STORY_CALM_EDGE_VOLUME || '+0%',
+    edgeVoice: 'hi-IN-MadhurNeural',
+    edgeRate: '+2%',
+    edgePitch: '+2Hz',
+    edgeVolume: '+10%',
     masterPreset: 'story_male_soft',
     fallbackSourceLabel: 'google-tts-api:hi-deep-enhanced',
     preferredHindiEngine: 'edge',
     allowPremiumCascade: false,
-    interScenePauseMs: 240,
-    dramaticPauseMs: 300,
+    interScenePauseMs: 200,
+    dramaticPauseMs: 280,
+  },
+  'owned-story-female-v1': {
+    id: 'owned-story-female-v1',
+    edgeVoice: 'hi-IN-SwaraNeural',
+    edgeRate: '+4%',
+    edgePitch: '+3Hz',
+    edgeVolume: '+12%',
+    masterPreset: 'story_female_expressive',
+    fallbackSourceLabel: 'google-tts-api:hi-deep-enhanced',
+    preferredHindiEngine: 'edge',
+    allowPremiumCascade: false,
+    interScenePauseMs: 200,
+    dramaticPauseMs: 320,
   },
 });
 const NARRATION_TAG_ALIASES = Object.freeze({
@@ -477,7 +494,15 @@ function resolveNarratorProfile(payload = null) {
     (payload.language === 'hi' || payload.language === 'hindi') &&
     (payload.contentType === 'story' || payload.contentType === 'storytelling')
   );
-  const fallbackProfileId = isHindiStory ? DEFAULT_HINDI_STORY_NARRATOR_PROFILE : DEFAULT_NEWS_NARRATOR_PROFILE;
+  let fallbackProfileId = isHindiStory ? DEFAULT_HINDI_STORY_NARRATOR_PROFILE : DEFAULT_NEWS_NARRATOR_PROFILE;
+  // L99: Rotate Hindi story voices — use female narrator for ~40% of stories
+  if (isHindiStory && !requestedProfileId) {
+    const storyType = (payload && payload.storyArc) || '';
+    const seed = Date.now() % 100;
+    if (/romantic|comedy|family|supernatural/i.test(storyType) || seed < 40) {
+      fallbackProfileId = 'owned-story-female-v1';
+    }
+  }
   const normalizedRequestedProfileId = isHindiStory && requestedProfileId === 'owned-story-narrator-v1'
     ? 'owned-story-calm-v2'
     : requestedProfileId;
@@ -976,67 +1001,42 @@ function createFallbackPayload(topic) {
     };
   }
 
+  // Topic-aware fallback: extract key terms and build a relevant mini-script
+  const topicClean = normalizeNarrationText(topic || 'trending news');
+  const topicWords = topicClean.split(/\s+/).filter(w => w.length > 2);
+  const keyPhrase = topicWords.slice(0, 5).join(' ') || 'this breaking story';
+
+  const fallbackSentences = [
+    `[intense] What just happened with ${keyPhrase} has left everyone stunned.`,
+    `Experts say this could change everything we thought we knew about ${topicWords[0] || 'the situation'}.`,
+    `The numbers are shocking — and nobody saw this coming.`,
+    `Sources close to the story reveal details that raise serious questions.`,
+    `[pause] But here is the part that nobody is talking about yet.`,
+    `The real impact goes far deeper than the headlines suggest.`,
+    `This is a developing situation and the consequences are just beginning to unfold.`,
+    `[calm] Follow for updates — the full story is still being revealed.`,
+  ];
+
+  const searchTermMap = [
+    { literal: `${topicWords[0] || 'news'} breaking story`, vibe: 'dramatic news', portrait: 'shocked reporter' },
+    { literal: `expert panel discussion ${topicWords[0] || ''}`, vibe: 'expert analysis', portrait: 'analyst portrait' },
+    { literal: 'shocking statistics graph', vibe: 'data visualization', portrait: 'concerned face' },
+    { literal: `${topicWords[0] || 'investigation'} documents`, vibe: 'investigation', portrait: 'investigator portrait' },
+    { literal: 'hidden secret reveal', vibe: 'mystery reveal', portrait: 'serious journalist' },
+    { literal: `${topicWords[0] || 'global'} impact world`, vibe: 'global impact', portrait: 'world leader portrait' },
+    { literal: 'breaking news live update', vibe: 'live update', portrait: 'news anchor' },
+    { literal: 'subscribe notification bell', vibe: 'call to action', portrait: 'presenter portrait' },
+  ];
+
   return {
-    scriptText:
-      'This self-healing video pipeline does not wait for perfect conditions. It turns unstable prompts, broken APIs, and silent inputs into a finished vertical story that keeps moving. Each sentence locks to a scene with pacing that follows the voice instead of fighting it. Pexels gets first shot with literal search terms. If that misses, Pixabay slides in with broader motion. If video still collapses, Unsplash images enter with a slow portrait zoom that feels alive. If the network disappears, verified local clips and an animated gradient preserve momentum. Audio follows the same discipline. Edge speech speaks first, Google TTS backs it up, and silence is generated only to keep the render structurally safe. Background music is optional, never fatal. Captions stay centered, active words flash yellow, transitions hit white for three frames, and the final export always leaves with measurable size, duration, and a clear recovery report.',
-    scenes: [
-      {
-        sentence: 'This self-healing video pipeline does not wait for perfect conditions.',
-        durationWeight: 1.05,
-        literalSearchTerm: 'control room screens',
-        fallbackVibeTerm: 'technology motion',
-        portraitSearchTerm: 'engineer portrait',
-      },
-      {
-        sentence: 'It turns unstable prompts, broken APIs, and silent inputs into a finished vertical story that keeps moving.',
-        durationWeight: 1.45,
-        literalSearchTerm: 'api dashboard',
-        fallbackVibeTerm: 'digital workflow',
-        portraitSearchTerm: 'startup founder portrait',
-      },
-      {
-        sentence: 'Each sentence locks to a scene with pacing that follows the voice instead of fighting it.',
-        durationWeight: 1.2,
-        literalSearchTerm: 'video editing timeline',
-        fallbackVibeTerm: 'creative process',
-        portraitSearchTerm: 'editor portrait',
-      },
-      {
-        sentence: 'Pexels gets first shot with literal search terms. If that misses, Pixabay slides in with broader motion.',
-        durationWeight: 1.3,
-        literalSearchTerm: 'server rack lights',
-        fallbackVibeTerm: 'future tech',
-        portraitSearchTerm: 'robot portrait',
-      },
-      {
-        sentence: 'If video still collapses, Unsplash images enter with a slow portrait zoom that feels alive.',
-        durationWeight: 1.15,
-        literalSearchTerm: 'portrait studio camera',
-        fallbackVibeTerm: 'cinematic portrait',
-        portraitSearchTerm: 'creative portrait',
-      },
-      {
-        sentence: 'If the network disappears, verified local clips and an animated gradient preserve momentum.',
-        durationWeight: 1.15,
-        literalSearchTerm: 'network cables',
-        fallbackVibeTerm: 'signal flow',
-        portraitSearchTerm: 'cyber portrait',
-      },
-      {
-        sentence: 'Audio follows the same discipline. Edge speech speaks first, Google TTS backs it up, and silence is generated only to keep the render structurally safe.',
-        durationWeight: 1.45,
-        literalSearchTerm: 'microphone recording booth',
-        fallbackVibeTerm: 'audio waveform',
-        portraitSearchTerm: 'podcast host portrait',
-      },
-      {
-        sentence: 'Background music is optional, never fatal. Captions stay centered, active words flash yellow, transitions hit white for three frames, and the final export always leaves with measurable size, duration, and a clear recovery report.',
-        durationWeight: 1.7,
-        literalSearchTerm: 'cinematic stage lights',
-        fallbackVibeTerm: 'victory energy',
-        portraitSearchTerm: 'hero portrait',
-      },
-    ],
+    scriptText: fallbackSentences.join(' '),
+    scenes: fallbackSentences.map((sentence, i) => ({
+      sentence,
+      durationWeight: i === 0 ? 1.4 : i === 4 ? 1.3 : i === 7 ? 1.1 : 1.15,
+      literalSearchTerm: searchTermMap[i].literal.trim(),
+      fallbackVibeTerm: searchTermMap[i].vibe,
+      portraitSearchTerm: searchTermMap[i].portrait,
+    })),
   };
 }
 
@@ -1617,8 +1617,34 @@ function trimIncompleteHookEnding(text) {
 }
 
 function finalizeHookPhrase(text, maxWords = 7) {
-  const trimmed = trimIncompleteHookEnding(clampDisplayWords(text, maxWords));
-  const fallback = trimmed || trimIncompleteHookEnding(String(text || '').trim()) || '';
+  // L99: Try to create a complete, curiosity-gap hook instead of just truncating
+  const clean = normalizeNarrationText(text || '');
+  if (!clean) return '';
+
+  // If the text has a natural break point (period, comma, dash) within word limit, use it
+  const sentences = clean.split(/[.!?]/);
+  if (sentences[0] && countWords(sentences[0]) <= maxWords && countWords(sentences[0]) >= 3) {
+    return sentences[0].charAt(0).toUpperCase() + sentences[0].slice(1);
+  }
+
+  // Try to cut at a natural phrase boundary (after a verb or noun, not a preposition)
+  const words = clean.split(/\s+/);
+  if (words.length > maxWords) {
+    // Find the best cut point — after a content word, not a connector
+    const CONNECTORS = new Set(['a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'for', 'by', 'with', 'is', 'are', 'was', 'and', 'or', 'but', 'that', 'this']);
+    let bestCut = maxWords;
+    for (let i = Math.min(maxWords, words.length - 1); i >= Math.max(3, maxWords - 2); i--) {
+      if (!CONNECTORS.has(words[i - 1].toLowerCase())) {
+        bestCut = i;
+        break;
+      }
+    }
+    const phrase = words.slice(0, bestCut).join(' ');
+    return phrase.charAt(0).toUpperCase() + phrase.slice(1);
+  }
+
+  const trimmed = trimIncompleteHookEnding(clampDisplayWords(clean, maxWords));
+  const fallback = trimmed || trimIncompleteHookEnding(clean) || '';
   return fallback
     ? fallback.charAt(0).toUpperCase() + fallback.slice(1)
     : '';

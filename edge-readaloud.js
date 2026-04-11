@@ -12,6 +12,24 @@ const EDGE_ORIGIN = 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold';
 const EDGE_MP3_FORMAT = 'audio-24khz-96kbitrate-mono-mp3';
 const EDGE_HINDI_MALE_VOICE = 'hi-IN-MadhurNeural';
 
+// L99: Hindi voice variety pool — rotate for freshness
+const EDGE_HINDI_VOICE_POOL = [
+  { id: 'hi-IN-MadhurNeural', gender: 'male', style: 'warm', bestFor: 'drama,romance' },
+  { id: 'hi-IN-SwaraNeural', gender: 'female', style: 'expressive', bestFor: 'story,thriller' },
+];
+
+function selectHindiVoice(storyType, seed) {
+  // Rotate voices based on content type and seed
+  if (/romantic|drama|love/i.test(storyType || '')) {
+    return seed % 2 === 0 ? EDGE_HINDI_VOICE_POOL[0] : EDGE_HINDI_VOICE_POOL[1];
+  }
+  if (/action|thriller|heist|sports/i.test(storyType || '')) {
+    return EDGE_HINDI_VOICE_POOL[0]; // Male for action
+  }
+  // Default: rotate
+  return EDGE_HINDI_VOICE_POOL[(seed || 0) % EDGE_HINDI_VOICE_POOL.length];
+}
+
 function ensureParentDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), {recursive: true});
 }
@@ -72,8 +90,8 @@ function createSpeechConfigMessage() {
 }
 
 function createSsmlMessage(requestId, text, voice, options = {}) {
-  const rate = options.rate || '-5%';
-  const pitch = options.pitch || '-2Hz';
+  const rate = options.rate || '+0%';
+  const pitch = options.pitch || '+0Hz';
   const volume = options.volume || '+15%';
   const locale = options.locale || voice.slice(0, 5);
   const repairedText = repairLikelyMojibake(text);
@@ -258,6 +276,8 @@ async function synthesizeEdgeReadAloudToMp3(options = {}) {
 
 module.exports = {
   EDGE_HINDI_MALE_VOICE,
+  EDGE_HINDI_VOICE_POOL,
+  selectHindiVoice,
   splitTextAtBreaks,
   synthesizeEdgeReadAloudToMp3,
 };

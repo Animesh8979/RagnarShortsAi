@@ -97,6 +97,58 @@ const STORY_ARCS = [
     sensoryAnchors: ['à¤¦à¤°à¥à¤¶à¤•à¥‹à¤‚ à¤•à¤¾ à¤¶à¥‹à¤°', 'à¤®à¤¿à¤Ÿà¥à¤Ÿà¥€ à¤•à¥€ à¤§à¥‚à¤²', 'à¤¦à¤¿à¤² à¤•à¥€ à¤§à¤¡à¤¼à¤•à¤¨'],
     sensoryAnchorsEn: ['roaring of the crowd', 'dust of the ground', 'heartbeat thumping'],
   },
+  // L99: NEW ARCS — Diverse genres for wider audience reach
+  {
+    type: 'comedy_chaos',
+    intro: 'hilarious Bollywood-style comedy with misunderstandings, over-the-top characters, and a twist ending that makes you laugh out loud',
+    subjects: [
+      'Shaadi Ka Hungama - Wedding Chaos',
+      'Galti Se Mistake - Accidental Trouble',
+      'Jugaad King - The Master of Hacks',
+    ],
+    placeHi: ['\u0936\u093E\u0926\u0940 \u0915\u093E \u092E\u0902\u0921\u092A', '\u0930\u0947\u0932\u0935\u0947 \u0915\u093E \u091C\u0928\u0930\u0932 \u0921\u093F\u092C\u094D\u092C\u093E', '\u0915\u0949\u0932\u0947\u091C \u0915\u0948\u0902\u091F\u0940\u0928'],
+    placeEn: ['wedding mandap', 'crowded railway platform', 'college canteen'],
+    objectHi: ['\u0917\u0932\u0924 \u0928\u0902\u092C\u0930 \u0915\u093E \u092B\u094B\u0928', '\u0909\u0932\u091D\u093E \u0939\u0941\u0906 \u0938\u0942\u091F\u0915\u0947\u0938', '\u091C\u0941\u0917\u093E\u0921\u093C \u0915\u093E \u0930\u093F\u092E\u094B\u091F'],
+    objectEn: ['wrong number phone call', 'mixed-up suitcase', 'jugaad remote control'],
+    threatHi: ['\u0917\u0941\u0938\u094D\u0938\u0947\u092C\u093E\u091C\u093C \u0938\u093E\u0938', '\u0926\u094B \u0932\u0921\u093C\u0915\u093F\u092F\u094B\u0902 \u0938\u0947 \u092A\u094D\u092F\u093E\u0930', '\u092A\u0941\u0932\u093F\u0938 \u0907\u0902\u0938\u094D\u092A\u0947\u0915\u094D\u091F\u0930'],
+    threatEn: ['angry father-in-law', 'dating two people at once', 'police inspector'],
+    sensoryAnchors: ['\u0922\u094B\u0932 \u0915\u0940 \u0925\u093E\u092A', '\u0939\u0901\u0938\u0940 \u0915\u0940 \u0917\u0942\u0902\u091C', '\u0936\u094B\u0930\u0917\u0941\u0932'],
+    sensoryAnchorsEn: ['dhol beating loudly', 'echo of laughter', 'chaos and shouting'],
+  },
+  {
+    type: 'supernatural_mystery',
+    intro: 'spine-tingling supernatural mystery with an ancient secret, a haunted location, and a shocking revelation',
+    subjects: [
+      'Haveli Ka Raaz - The Mansion Secret',
+      'Aatma Ki Pukar - The Spirit Call',
+      'Bhooli Bisri Kahani - The Forgotten Tale',
+    ],
+    placeHi: ['\u092A\u0941\u0930\u093E\u0928\u0940 \u0939\u0935\u0947\u0932\u0940', '\u091C\u0902\u0917\u0932 \u0915\u093E \u092E\u0902\u0926\u093F\u0930', '\u0935\u0940\u0930\u093E\u0928 \u0915\u093F\u0932\u093E'],
+    placeEn: ['ancient haveli mansion', 'jungle temple', 'abandoned fort'],
+    objectHi: ['\u092A\u0941\u0930\u093E\u0928\u093E \u0932\u0949\u0915\u0947\u091F', '\u091C\u0932\u0924\u0940 \u092E\u094B\u092E\u092C\u0924\u094D\u0924\u0940', '\u0930\u0939\u0938\u094D\u092F\u092E\u092F \u0928\u0915\u094D\u0936\u093E'],
+    objectEn: ['ancient locket', 'burning candle', 'mysterious map'],
+    threatHi: ['\u0905\u0926\u0943\u0936\u094D\u092F \u0936\u0915\u094D\u0924\u093F', '\u0936\u094D\u0930\u093E\u092A \u0915\u0940 \u0906\u0935\u093E\u091C\u093C', '\u0930\u0939\u0938\u094D\u092F\u092E\u092F \u092A\u0930\u091B\u093E\u0908'],
+    threatEn: ['invisible force', 'curse voice', 'mysterious shadow'],
+    sensoryAnchors: ['\u0920\u0902\u0921\u0940 \u0939\u0935\u093E \u0915\u093E \u091D\u094B\u0902\u0915\u093E', '\u092E\u094B\u092E\u092C\u0924\u094D\u0924\u0940 \u0915\u0940 \u091F\u093F\u092E\u091F\u093F\u092E\u093E\u0924\u0940 \u0930\u094B\u0936\u0928\u0940', '\u0926\u0930\u0935\u093E\u091C\u093C\u0947 \u0915\u0940 \u091A\u0930\u092E\u0930\u093E\u0939\u091F'],
+    sensoryAnchorsEn: ['gust of cold wind', 'flickering candlelight', 'creaking of doors'],
+  },
+  {
+    type: 'family_drama',
+    intro: 'emotional Bollywood family drama with relationships, sacrifice, tears, and a redemption arc that hits the heart',
+    subjects: [
+      'Maa Ki Duaa - A Mother Prayer',
+      'Rishtey Ka Bandhan - Bonds of Blood',
+      'Ghar Wapsi - The Homecoming',
+    ],
+    placeHi: ['\u0917\u093E\u0901\u0935 \u0915\u093E \u092A\u0941\u0930\u093E\u0928\u093E \u0918\u0930', '\u0936\u0939\u0930 \u0915\u0940 \u091B\u094B\u091F\u0940 \u091D\u094B\u092A\u0921\u093C\u0940', '\u0905\u0938\u094D\u092A\u0924\u093E\u0932 \u0915\u093E \u0917\u0932\u093F\u092F\u093E\u0930\u093E'],
+    placeEn: ['village ancestral home', 'city apartment', 'hospital corridor'],
+    objectHi: ['\u092E\u093E\u0901 \u0915\u093E \u092A\u0941\u0930\u093E\u0928\u093E \u0916\u0924', '\u091F\u0942\u091F\u093E \u0939\u0941\u0906 \u092B\u094B\u091F\u094B', '\u0926\u093E\u0926\u0940 \u0915\u0940 \u0905\u0902\u0917\u0942\u0920\u0940'],
+    objectEn: ['old letter from mother', 'torn family photo', 'grandfather ring'],
+    threatHi: ['\u092A\u0941\u0930\u093E\u0928\u0940 \u0926\u0941\u0936\u094D\u092E\u0928\u0940', '\u092A\u0930\u093F\u0935\u093E\u0930 \u0915\u093E \u091F\u0942\u091F\u0928\u093E', '\u092C\u0940\u092E\u093E\u0930\u0940'],
+    threatEn: ['old rivalry', 'family splitting apart', 'terminal illness'],
+    sensoryAnchors: ['\u0906\u0901\u0938\u0941\u0913\u0902 \u0915\u0940 \u0917\u0930\u094D\u092E\u093E\u0939\u091F', '\u091A\u0942\u0932\u094D\u0939\u0947 \u0915\u093E \u0927\u0941\u0906\u0901', '\u092E\u093F\u091F\u094D\u091F\u0940 \u0915\u0940 \u0916\u0941\u0936\u092C\u0942'],
+    sensoryAnchorsEn: ['warmth of tears', 'smoke of the hearth', 'scent of fresh soil'],
+  },
 ];
 
 const HEROES = ['à¤¦à¥‡à¤µ', 'à¤†à¤°à¤µ', 'à¤¨à¤¯à¤¨', 'à¤°à¤¾à¤˜à¤µ', 'à¤‡à¤°à¤¾', 'à¤•à¤¾à¤µà¥à¤¯à¤¾', 'à¤µà¤¿à¤µà¤¾à¤¨'];
