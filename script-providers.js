@@ -2183,9 +2183,124 @@ async function generateScript(topic, recoveryLog = [], topicContext = null) {
   return generateLocalTemplate(topic, topicContext);
 }
 
+// ──────────────────────────────────────────────
+// V99: Script Battle Royale
+// ──────────────────────────────────────────────
+
+/**
+ * Score a script for viral potential.
+ * Higher score = more likely to perform well.
+ */
+function scoreScript(parsed, topic) {
+  if (!parsed || !parsed.scriptText) return 0;
+  const text = parsed.scriptText;
+  let score = 0;
+
+  // Hook strength: does first sentence have number, proper noun, or action verb?
+  const firstSentence = text.split(/[.!?।]/)[0] || '';
+  if (/\d/.test(firstSentence)) score += 3;
+  if (/\b[A-Z][a-z]{2,}/.test(firstSentence)) score += 3;
+  if (/\b(just|now|broke|launched|banned|dropped|hit|warned|crashed|surged|revealed|discovered)\b/i.test(firstSentence)) score += 3;
+
+  // Specificity: count concrete details
+  const concreteMatches = text.match(/\b(\d+[%$]?|\d{4}|[A-Z][a-z]{2,})/g) || [];
+  score += Math.min(8, concreteMatches.length);
+
+  // Emotional range: count emotion tags
+  const emotionTags = (text.match(/\[(intense|pause|gasp|calm|urgent|whisper|beat)\]/gi) || []).length;
+  score += Math.min(5, emotionTags * 2);
+
+  // Word economy: penalize scripts over 90 words
+  const wc = countWords(text);
+  if (wc >= 55 && wc <= 85) score += 5;
+  if (wc > 90) score -= 3;
+  if (wc < 40) score -= 5;
+
+  // CTA presence at end
+  const lastSentence = text.split(/[.!?।]/).filter(Boolean).pop() || '';
+  if (/follow|subscribe|share|comment|watch|learn|discover/i.test(lastSentence)) score += 2;
+
+  // Scene count (4-8 is ideal for shorts)
+  const sceneCount = parsed.scenes ? parsed.scenes.length : 0;
+  if (sceneCount >= 3 && sceneCount <= 8) score += 3;
+
+  return score;
+}
+
+/**
+ * Generate scripts from multiple providers in parallel and pick the best.
+ * "Battle Royale" mode — may the best script win.
+ *
+ * @param {string} topic - Video topic
+ * @param {Array} recoveryLog - Recovery log for debugging
+ * @param {object} topicContext - Topic context
+ * @param {object} [options] - Options { maxCandidates: 3 }
+ * @returns {Promise<object>} Best script payload
+ */
+async function generateBattleScript(topic, recoveryLog = [], topicContext = null, options = {}) {
+  const maxCandidates = options.maxCandidates || 3;
+  const prompt = buildScriptPrompt(topic, topicContext);
+
+  // Collect available providers
+  const availableProviders = PROVIDERS.filter(provider => {
+    if (SCRIPT_FREE_ONLY_MODE && provider.freeOnly === false) return false;
+    if (getProviderBlockRemainingSeconds(provider.label) > 0) return false;
+    if (provider.family === 'gemini' && geminiBackoffUntilMs > Date.now()) return false;
+    const apiKey = provider.family === 'ollama' ? 'local' : process.env[provider.envKey];
+    return !!apiKey;
+  });
+
+  if (availableProviders.length === 0) {
+    recoveryLog.push('Script battle: No providers available, using local template.');
+    return generateLocalTemplate(topic, topicContext);
+  }
+
+  // Select top N providers for battle
+  const battleProviders = availableProviders.slice(0, maxCandidates);
+  console.log(`   [v99-battle] Racing ${battleProviders.length} providers: ${battleProviders.map(p => p.label).join(', ')}`);
+
+  // Generate in parallel
+  const candidates = await Promise.allSettled(
+    battleProviders.map(async (provider) => {
+      const apiKey = provider.family === 'ollama' ? 'local' : process.env[provider.envKey];
+      const rawText = await provider.call(prompt, apiKey);
+      const parsed = parseScriptResponse(rawText, provider.label, topic, topicContext);
+      if (!parsed) throw new Error('Unparseable');
+      return { ...parsed, provider: provider.label };
+    })
+  );
+
+  const scripts = candidates
+    .filter(r => r.status === 'fulfilled' && r.value)
+    .map(r => r.value);
+
+  if (scripts.length === 0) {
+    recoveryLog.push('Script battle: All parallel attempts failed, falling back to sequential.');
+    return generateScript(topic, recoveryLog, topicContext);
+  }
+
+  // Score and pick best
+  const scored = scripts.map(s => ({
+    ...s,
+    viralScore: scoreScript(s, topic),
+  })).sort((a, b) => b.viralScore - a.viralScore);
+
+  const winner = scored[0];
+  const wc = countWords(winner.scriptText);
+  console.log(`   [v99-battle] Winner: ${winner.provider} (score: ${winner.viralScore}, ${wc} words, ${winner.scenes.length} scenes)`);
+  if (scored.length > 1) {
+    console.log(`   [v99-battle] Runner-up: ${scored[1].provider} (score: ${scored[1].viralScore})`);
+  }
+
+  recoveryLog.push(`Script battle: ${winner.provider} won (score: ${winner.viralScore}) from ${scripts.length} candidates.`);
+  return winner;
+}
+
 module.exports = {
   buildScriptPrompt,
   countWords,
   generateLocalTemplate,
   generateScript,
+  generateBattleScript,
+  scoreScript,
 };

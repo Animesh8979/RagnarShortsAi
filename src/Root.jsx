@@ -4,6 +4,7 @@ import { UniversalShort } from './Composition';
 import { IroncladV10Composition } from './IroncladV10Composition';
 import { V12Composition } from './V12Composition';
 import { V15Composition } from './V15Composition';
+import { V99Composition } from './V99Composition';
 import { ThumbnailComposition } from './ThumbnailComposition';
 
 export const RemotionRoot = () => {
@@ -61,6 +62,8 @@ export const RemotionRoot = () => {
           hookPackage: null,
           avatarPackage: null,
           retentionBlueprint: null,
+          sfxPack: null,
+          beatFrames: [],
           durationInFrames: 300,
         }}
         fps={30}
@@ -85,6 +88,33 @@ export const RemotionRoot = () => {
           hookPackage: null,
           avatarPackage: null,
           retentionBlueprint: null,
+          durationInFrames: 300,
+        }}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="V99Composition"
+        component={V99Composition}
+        calculateMetadata={({ props }) => {
+          return { durationInFrames: props.durationInFrames || 300, props };
+        }}
+        defaultProps={{
+          scenes: [],
+          timestamps: [],
+          captionChunks: [],
+          mixedAudioFile: null,
+          voiceoverFile: null,
+          hasBGM: false,
+          audioMixMode: 'voice_only',
+          qualityReport: null,
+          hookPackage: null,
+          avatarPackage: null,
+          retentionBlueprint: null,
+          dopaminePlan: [],
+          sfxPack: null,
+          beatFrames: [],
           durationInFrames: 300,
         }}
         fps={30}

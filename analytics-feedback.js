@@ -149,12 +149,208 @@ function loadFeedbackModel() {
   return { topicScores: {}, hookStyleScores: {}, lowPerformers: [] };
 }
 
+// ──────────────────────────────────────────────
+// V99: Enhanced Real-Time Performance Scoring
+// ──────────────────────────────────────────────
+
+const V99_SCORING_MODEL_PATH = path.join(LEDGER_DIR, 'v99-scoring-model.json');
+
+/**
+ * Build V99 scoring model with multi-dimensional tracking.
+ * Pulls YouTube Analytics every time it's called (designed for 6-hour intervals).
+ */
+function buildV99ScoringModel() {
+  ensureDir(LEDGER_DIR);
+
+  const model = {
+    topicClusters: {},
+    hookFormulas: {},
+    thumbnailTemplates: {},
+    voiceProfiles: {},
+    contentTypes: {},
+    uploadTimes: {},
+    durations: {},
+    platformPerformance: {},
+    nicheScores: {},
+    sfxDensityScores: {},
+    lastUpdated: new Date().toISOString(),
+  };
+
+  // Load existing AB test data
+  const abDataPath = path.join(LEDGER_DIR, 'ab-tests', 'results.json');
+  let abData = null;
+  try {
+    if (fs.existsSync(abDataPath)) {
+      abData = JSON.parse(fs.readFileSync(abDataPath, 'utf-8'));
+    }
+  } catch (_) {}
+
+  // Load YouTube metrics
+  const metricFiles = fs.existsSync(LEDGER_DIR)
+    ? fs.readdirSync(LEDGER_DIR)
+        .filter(f => f.startsWith('youtube-metrics-') && f.endsWith('.json'))
+        .sort()
+        .reverse()
+        .slice(0, 7) // Last 7 days
+    : [];
+
+  const allRecords = [];
+  for (const file of metricFiles) {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(LEDGER_DIR, file), 'utf-8'));
+      if (Array.isArray(data.records)) {
+        allRecords.push(...data.records);
+      }
+    } catch (_) {}
+  }
+
+  // Process records into multi-dimensional scoring
+  for (const record of allRecords) {
+    const views = Number(record.viewCount) || 0;
+    const likes = Number(record.likeCount) || 0;
+    const comments = Number(record.commentCount) || 0;
+    const engagement = views > 0 ? ((likes + comments) / views) * 100 : 0;
+
+    // Content type scoring
+    const contentType = record.contentType || 'news';
+    if (!model.contentTypes[contentType]) {
+      model.contentTypes[contentType] = { totalViews: 0, count: 0, avgEngagement: 0, engagementSum: 0 };
+    }
+    model.contentTypes[contentType].totalViews += views;
+    model.contentTypes[contentType].count += 1;
+    model.contentTypes[contentType].engagementSum += engagement;
+    model.contentTypes[contentType].avgEngagement =
+      model.contentTypes[contentType].engagementSum / model.contentTypes[contentType].count;
+
+    // Upload time scoring (IST)
+    if (record.publishedAt) {
+      try {
+        const d = new Date(record.publishedAt);
+        const istHour = (d.getUTCHours() + 5) % 24;
+        const slot = `${String(istHour).padStart(2, '0')}:00`;
+        if (!model.uploadTimes[slot]) model.uploadTimes[slot] = { totalViews: 0, count: 0 };
+        model.uploadTimes[slot].totalViews += views;
+        model.uploadTimes[slot].count += 1;
+      } catch (_) {}
+    }
+
+    // Duration bucketing
+    if (record.duration) {
+      const match = String(record.duration).match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
+      if (match) {
+        const sec = (parseInt(match[1] || '0', 10) * 60) + parseInt(match[2] || '0', 10);
+        const bucket = sec < 30 ? '<30s' : sec < 45 ? '30-45s' : sec < 60 ? '45-60s' : '>60s';
+        if (!model.durations[bucket]) model.durations[bucket] = { totalViews: 0, count: 0, avgCompletion: 0 };
+        model.durations[bucket].totalViews += views;
+        model.durations[bucket].count += 1;
+      }
+    }
+  }
+
+  // Integrate AB test results
+  if (abData && Array.isArray(abData.assignments)) {
+    for (const assignment of abData.assignments) {
+      if (!assignment.metrics) continue;
+
+      const variants = assignment.variants || {};
+
+      // Hook formula tracking
+      if (variants.hook_formula) {
+        const f = variants.hook_formula;
+        if (!model.hookFormulas[f]) model.hookFormulas[f] = { totalCtr: 0, count: 0 };
+        model.hookFormulas[f].count += 1;
+        if (assignment.metrics.ctr) model.hookFormulas[f].totalCtr += Number(assignment.metrics.ctr);
+      }
+
+      // Thumbnail template tracking
+      if (variants.thumbnail_template) {
+        const t = variants.thumbnail_template;
+        if (!model.thumbnailTemplates[t]) model.thumbnailTemplates[t] = { totalCtr: 0, count: 0 };
+        model.thumbnailTemplates[t].count += 1;
+        if (assignment.metrics.ctr) model.thumbnailTemplates[t].totalCtr += Number(assignment.metrics.ctr);
+      }
+
+      // Voice profile tracking
+      if (variants.voice_profile) {
+        const v = variants.voice_profile;
+        if (!model.voiceProfiles[v]) model.voiceProfiles[v] = { totalCompletion: 0, count: 0 };
+        model.voiceProfiles[v].count += 1;
+        if (assignment.metrics.completion_rate) model.voiceProfiles[v].totalCompletion += Number(assignment.metrics.completion_rate);
+      }
+
+      // SFX density tracking
+      if (variants.sfx_density) {
+        const s = variants.sfx_density;
+        if (!model.sfxDensityScores[s]) model.sfxDensityScores[s] = { totalCompletion: 0, count: 0 };
+        model.sfxDensityScores[s].count += 1;
+        if (assignment.metrics.completion_rate) model.sfxDensityScores[s].totalCompletion += Number(assignment.metrics.completion_rate);
+      }
+    }
+  }
+
+  // Save
+  try {
+    fs.writeFileSync(V99_SCORING_MODEL_PATH, JSON.stringify(model, null, 2));
+    console.log(`[Analytics-V99] Scoring model built: ${allRecords.length} records, ${metricFiles.length} metric files.`);
+  } catch (_) {}
+
+  return model;
+}
+
+/**
+ * Load V99 scoring model.
+ */
+function loadV99ScoringModel() {
+  try {
+    if (fs.existsSync(V99_SCORING_MODEL_PATH)) {
+      return JSON.parse(fs.readFileSync(V99_SCORING_MODEL_PATH, 'utf-8'));
+    }
+  } catch (_) {}
+  return null;
+}
+
+/**
+ * Predict performance for a topic + niche combination.
+ * Returns a score 0-100.
+ */
+function predictPerformance(topic, niche) {
+  const model = loadV99ScoringModel();
+  if (!model) return 50; // Default neutral score
+
+  let score = 50;
+
+  // Content type boost
+  const ct = model.contentTypes[niche] || model.contentTypes['news'];
+  if (ct && ct.count > 3) {
+    const avgViews = ct.totalViews / ct.count;
+    if (avgViews > 10000) score += 15;
+    else if (avgViews > 5000) score += 10;
+    else if (avgViews > 1000) score += 5;
+  }
+
+  // Check against low performers from base model
+  const baseModel = loadFeedbackModel();
+  if (baseModel.lowPerformers && baseModel.lowPerformers.length > 0) {
+    const topicLower = (topic || '').toLowerCase();
+    const similarToLowPerformer = baseModel.lowPerformers.some(lp =>
+      topicLower.includes(lp.toLowerCase().slice(0, 15)) || lp.toLowerCase().includes(topicLower.slice(0, 15))
+    );
+    if (similarToLowPerformer) score -= 20;
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
 // Run standalone
 if (require.main === module) {
   buildFeedbackModel();
+  buildV99ScoringModel();
 }
 
 module.exports = {
   buildFeedbackModel,
-  loadFeedbackModel
+  loadFeedbackModel,
+  buildV99ScoringModel,
+  loadV99ScoringModel,
+  predictPerformance,
 };

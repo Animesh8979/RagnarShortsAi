@@ -502,13 +502,140 @@ async function startDaemon() {
   process.stdin.resume();
 }
 
+// ──────────────────────────────────────────────
+// V99: Parallel Render Engine + Multi-Niche Expansion
+// ──────────────────────────────────────────────
+
+const MAX_PARALLEL_RENDERS = Math.max(1, Number(process.env.V99_PARALLEL_RENDERS || 2));
+const V99_MODE = process.argv.includes('--v99') || process.env.V99_MODE === '1';
+
+// V99 expanded slot schedule: 20 videos across 5 niches (every 45-60 min, 6AM-11PM IST)
+const V99_SLOTS = [
+  { hour: 6, minute: 0, niche: 'breaking_news', label: 'V99-01 (6:00AM) NEWS' },
+  { hour: 6, minute: 45, niche: 'tech_ai', label: 'V99-02 (6:45AM) TECH' },
+  { hour: 7, minute: 30, niche: 'hindi_story', label: 'V99-03 (7:30AM) STORY' },
+  { hour: 8, minute: 15, niche: 'facts_trivia', label: 'V99-04 (8:15AM) FACTS' },
+  { hour: 9, minute: 0, niche: 'breaking_news', label: 'V99-05 (9:00AM) NEWS' },
+  { hour: 9, minute: 45, niche: 'motivation', label: 'V99-06 (9:45AM) MOTIVATION' },
+  { hour: 10, minute: 30, niche: 'tech_ai', label: 'V99-07 (10:30AM) TECH' },
+  { hour: 11, minute: 15, niche: 'breaking_news', label: 'V99-08 (11:15AM) NEWS' },
+  { hour: 12, minute: 0, niche: 'facts_trivia', label: 'V99-09 (12:00PM) FACTS' },
+  { hour: 12, minute: 45, niche: 'hindi_story', label: 'V99-10 (12:45PM) STORY' },
+  { hour: 13, minute: 30, niche: 'tech_ai', label: 'V99-11 (1:30PM) TECH' },
+  { hour: 14, minute: 15, niche: 'breaking_news', label: 'V99-12 (2:15PM) NEWS' },
+  { hour: 15, minute: 0, niche: 'motivation', label: 'V99-13 (3:00PM) MOTIVATION' },
+  { hour: 15, minute: 45, niche: 'facts_trivia', label: 'V99-14 (3:45PM) FACTS' },
+  { hour: 16, minute: 30, niche: 'breaking_news', label: 'V99-15 (4:30PM) NEWS' },
+  { hour: 17, minute: 15, niche: 'tech_ai', label: 'V99-16 (5:15PM) TECH' },
+  { hour: 18, minute: 0, niche: 'hindi_story', label: 'V99-17 (6:00PM) STORY' },
+  { hour: 19, minute: 0, niche: 'breaking_news', label: 'V99-18 (7:00PM) NEWS' },
+  { hour: 20, minute: 0, niche: 'facts_trivia', label: 'V99-19 (8:00PM) FACTS' },
+  { hour: 21, minute: 0, niche: 'motivation', label: 'V99-20 (9:00PM) MOTIVATION' },
+];
+
+/**
+ * Run parallel render jobs (V99 mode).
+ * Processes up to MAX_PARALLEL_RENDERS videos concurrently.
+ */
+async function runParallelSlots(slots) {
+  const { Worker } = require('worker_threads');
+  const queue = [...slots];
+  const results = [];
+  const active = new Set();
+
+  return new Promise((resolve) => {
+    function tryLaunch() {
+      while (active.size < MAX_PARALLEL_RENDERS && queue.length > 0) {
+        const slot = queue.shift();
+        log(`[V99-parallel] Launching: ${slot.label}`);
+
+        try {
+          const worker = new Worker(path.join(__dirname, 'render-worker.js'), {
+            workerData: {
+              topic: slot.topic || slot.label,
+              slotIndex: slots.indexOf(slot),
+              niche: slot.niche || 'breaking_news',
+              options: { v99: true },
+            },
+          });
+
+          active.add(worker);
+
+          worker.on('message', (msg) => {
+            if (msg.type === 'status') {
+              log(`[V99-parallel] ${msg.message}`);
+            } else if (msg.type === 'complete' || msg.type === 'error') {
+              results.push({
+                slot: slot.label,
+                success: msg.type === 'complete' && msg.success,
+                error: msg.error,
+              });
+              active.delete(worker);
+              tryLaunch();
+            }
+          });
+
+          worker.on('error', (err) => {
+            log(`[V99-parallel] Worker error for ${slot.label}: ${String(err.message).slice(0, 100)}`);
+            results.push({ slot: slot.label, success: false, error: err.message });
+            active.delete(worker);
+            tryLaunch();
+          });
+
+          worker.on('exit', () => {
+            active.delete(worker);
+            if (active.size === 0 && queue.length === 0) {
+              resolve(results);
+            }
+          });
+        } catch (err) {
+          log(`[V99-parallel] Failed to launch worker for ${slot.label}: ${err.message}`);
+          results.push({ slot: slot.label, success: false, error: err.message });
+          tryLaunch();
+        }
+      }
+
+      if (active.size === 0 && queue.length === 0) {
+        resolve(results);
+      }
+    }
+
+    tryLaunch();
+  });
+}
+
+/**
+ * Get V99 slot schedule for current day.
+ */
+function getV99DaySlots() {
+  return V99_SLOTS.map((slot, idx) => ({
+    ...slot,
+    index: idx,
+  }));
+}
+
 if (RUN_NOW) {
-  runDailyBatch()
-    .then((results) => process.exit(results.some((result) => !result.success) ? 1 : 0))
-    .catch((error) => {
-      log('FATAL: ' + error.message);
-      process.exit(1);
-    });
+  if (V99_MODE) {
+    log('V99 MODE: Running expanded 20-slot batch with parallel rendering');
+    const v99Slots = getV99DaySlots();
+    runParallelSlots(v99Slots)
+      .then((results) => {
+        const successCount = results.filter(r => r.success).length;
+        log(`V99 batch complete: ${successCount}/${results.length} succeeded`);
+        process.exit(results.some((r) => !r.success) ? 1 : 0);
+      })
+      .catch((error) => {
+        log('V99 FATAL: ' + error.message);
+        process.exit(1);
+      });
+  } else {
+    runDailyBatch()
+      .then((results) => process.exit(results.some((result) => !result.success) ? 1 : 0))
+      .catch((error) => {
+        log('FATAL: ' + error.message);
+        process.exit(1);
+      });
+  }
 } else {
   startDaemon().catch((error) => {
     log('FATAL: ' + error.message);

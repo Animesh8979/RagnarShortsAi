@@ -2226,6 +2226,7 @@ export const V12Composition = ({
   avatarPackage = null,
   retentionBlueprint = null,
   enableV13Hacks = false,
+  sfxPack = null,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -2260,7 +2261,7 @@ export const V12Composition = ({
 
       <CinematicFxLayer hookPackage={hookPackage} />
       <RetentionEffectsLayer interruptMoments={interruptMoments} hookPackage={hookPackage} />
-      <MotionSfxLayer scenes={scenes} hookPackage={hookPackage} />
+      <MotionSfxLayer scenes={scenes} hookPackage={hookPackage} sfxPack={sfxPack} />
       {!mixedAudioFile && hasBGM ? <BackgroundMusic /> : null}
       {resolvedAudioFile ? <Audio src={staticFile(`audio/${resolvedAudioFile}`)} volume={1} /> : null}
       <HookLayer hookPackage={hookPackage} scenes={scenes} />

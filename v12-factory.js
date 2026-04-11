@@ -34,6 +34,7 @@ const {
   stripTrailingClosingCta,
 } = require('./growth-cta');
 const {selectTrack: selectLibraryTrack, getLibraryStats} = require('./music-library');
+const {selectSfxPack: selectLibrarySfxPack} = require('./sfx-library');
 
 const ROOT_DIR = process.cwd();
 const AUDIO_DIR = path.join(ROOT_DIR, 'public', 'audio');
@@ -95,6 +96,20 @@ const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3:8b';
 const SCRIPT_TIMEOUT_MS = 45000;
 const PRIMARY_MALE_VOICE = 'am_fenrir';
 const KOKORO_SPEED = 1.0;
+
+// V99: Kokoro voice rotation by content type
+const V99_KOKORO_VOICES = {
+  news: ['am_fenrir', 'af_sky'],
+  story: ['am_adam', 'af_bella'],
+  tech: ['af_sky', 'am_fenrir'],
+  motivation: ['am_adam', 'af_sky'],
+  general: ['am_fenrir', 'af_sky'],
+};
+
+function selectKokoroVoice(contentType, seed) {
+  const pool = V99_KOKORO_VOICES[contentType] || V99_KOKORO_VOICES.general;
+  return pool[(seed || 0) % pool.length];
+}
 const INTER_SCENE_PAUSE_MS = 220;
 const NARRATION_SAMPLE_RATE = 24000;
 const EDGE_SAMPLE_RATE = 24000;
@@ -6793,6 +6808,28 @@ function buildProps(payload, scenes, voiceoverFile, audioMix, durationInFrames, 
   retentionBlueprint.bgmPrompt = payload && payload.bgmPrompt ? payload.bgmPrompt : null;
   retentionBlueprint.visualCues = effectiveVisualCues;
 
+  // V99: Build SFX pack from real sound effects library
+  let sfxPack = null;
+  try {
+    const contentType = payload && payload.contentType ? payload.contentType : 'news';
+    const seed = Date.now() % 100000;
+    sfxPack = selectLibrarySfxPack(contentType, syncedScenes.length, seed);
+    if (sfxPack && sfxPack.stats) {
+      console.log(`   SFX pack: ${sfxPack.stats.total} files across ${Object.keys(sfxPack.stats.categories).length} categories`);
+    }
+  } catch (sfxErr) {
+    console.log(`   SFX pack skipped: ${String(sfxErr.message || sfxErr).slice(0, 80)}`);
+  }
+
+  // V99: Convert SFX pack paths to relative paths for Remotion staticFile()
+  const sfxPackForComposition = sfxPack ? {
+    hookHit: sfxPack.hookHit ? sfxPack.hookHit.relativePath : null,
+    transitionWhooshes: (sfxPack.transitionWhooshes || []).map(w => w ? w.relativePath : null),
+    outro: sfxPack.outro ? sfxPack.outro.relativePath : null,
+    emphasis: sfxPack.emphasis ? sfxPack.emphasis.relativePath : null,
+    riser: sfxPack.riser ? sfxPack.riser.relativePath : null,
+  } : null;
+
   return {
     scriptText: payload.scriptText,
     scenes: syncedScenes,
@@ -6806,6 +6843,8 @@ function buildProps(payload, scenes, voiceoverFile, audioMix, durationInFrames, 
     hookPackage,
     avatarPackage,
     retentionBlueprint,
+    sfxPack: sfxPackForComposition,
+    beatFrames,
     durationInFrames,
     enableV13Hacks: process.env.ENABLE_V13_HACKS === 'true',
   };

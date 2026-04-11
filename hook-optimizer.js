@@ -208,6 +208,83 @@ async function optimizeHook(payload, topicContext) {
   }
 }
 
+// ──────────────────────────────────────────────
+// V99: Formula-Based Hook Engine
+// ──────────────────────────────────────────────
+
+const HOOK_FORMULAS = [
+  { name: 'contradiction', template: 'This {cheap_thing} works better than {expensive_thing}', style: 'tension' },
+  { name: 'countdown', template: '{number} {things} that {shocking_fact}', style: 'specificity' },
+  { name: 'secret', template: 'The {industry} doesn\'t want you to know this', style: 'tension' },
+  { name: 'question', template: 'Why does nobody talk about {thing}?', style: 'consequence' },
+  { name: 'timeframe', template: 'In {short_time}, {big_change} happened', style: 'consequence' },
+  { name: 'authority', template: '{expert} just revealed {thing}', style: 'specificity' },
+  { name: 'social_proof', template: '{big_number} people missed this about {topic}', style: 'consequence' },
+  { name: 'prediction', template: 'This changes everything about {topic} in {year}', style: 'tension' },
+];
+
+/**
+ * Generate hook variants using formula templates.
+ * Returns scored variants for selection.
+ *
+ * @param {string} topic - Video topic
+ * @param {string} [formulaName] - Specific formula to prefer
+ * @returns {Array<{headline: string, formula: string, score: number}>}
+ */
+function generateFormulaHooks(topic, formulaName = null) {
+  const variants = [];
+  const topicWords = (topic || '').split(/\s+/).filter(w => w.length > 3);
+  const properNouns = (topic || '').match(/\b[A-Z][a-z]{2,}\b/g) || [];
+  const numbers = (topic || '').match(/\d+/g) || [];
+  const year = new Date().getFullYear();
+
+  for (const formula of HOOK_FORMULAS) {
+    let headline = formula.template;
+    const mainNoun = properNouns[0] || topicWords[0] || 'This';
+    const number = numbers[0] || '3';
+
+    headline = headline
+      .replace('{cheap_thing}', mainNoun)
+      .replace('{expensive_thing}', 'experts predicted')
+      .replace('{number}', number)
+      .replace('{things}', 'facts about ' + mainNoun)
+      .replace('{shocking_fact}', 'will shock you')
+      .replace('{industry}', mainNoun)
+      .replace('{thing}', topicWords.slice(0, 3).join(' ') || topic.slice(0, 30))
+      .replace('{expert}', properNouns[0] || 'Scientists')
+      .replace('{big_number}', '99%')
+      .replace('{topic}', mainNoun)
+      .replace('{short_time}', '24 hours')
+      .replace('{big_change}', topicWords.slice(0, 2).join(' ') || 'everything')
+      .replace('{year}', String(year));
+
+    const score = scoreHook({ headline, style: formula.style });
+    // Boost if this is the preferred formula
+    const boost = formulaName && formula.name === formulaName ? 3 : 0;
+
+    variants.push({
+      headline: headline.slice(0, 60),
+      formula: formula.name,
+      style: formula.style,
+      score: score + boost,
+    });
+  }
+
+  return variants.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Get the best formula hook for a topic.
+ */
+function getBestFormulaHook(topic, preferredFormula = null) {
+  const variants = generateFormulaHooks(topic, preferredFormula);
+  return variants.length > 0 ? variants[0] : null;
+}
+
 module.exports = {
   optimizeHook,
+  generateFormulaHooks,
+  getBestFormulaHook,
+  HOOK_FORMULAS,
+  scoreHook,
 };

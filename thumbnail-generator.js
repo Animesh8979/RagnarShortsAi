@@ -277,8 +277,105 @@ function generateThumbnail(options) {
   return results;
 }
 
+// ──────────────────────────────────────────────
+// V99: Enhanced Thumbnail Generation
+// ──────────────────────────────────────────────
+
+const EMOJI_MAP = {
+  breaking: ['😱', '🚨', '⚡'],
+  reveal: ['🔥', '💡', '🤯'],
+  versus: ['⚔️', '💥', '🥊'],
+  shock: ['💀', '😱', '🔥'],
+};
+
+/**
+ * Pick emotion-appropriate emoji based on template and content.
+ */
+function selectEmoji(template, hookText) {
+  const pool = EMOJI_MAP[template] || EMOJI_MAP.shock;
+  const text = (hookText || '').toLowerCase();
+
+  // Context-aware selection
+  if (/dead|kill|fatal|die/i.test(text)) return '💀';
+  if (/fire|burn|hot|explod/i.test(text)) return '🔥';
+  if (/war|attack|bomb|strike/i.test(text)) return '⚡';
+  if (/secret|reveal|expos/i.test(text)) return '🤯';
+
+  // Rotate from pool based on hook text length (pseudo-random)
+  return pool[(hookText || '').length % pool.length];
+}
+
+/**
+ * Generate V99-enhanced thumbnail with multiple variants for A/B testing.
+ *
+ * @param {string} hookText - Hook headline text
+ * @param {object} options - { title, contentType, subjectImage, outputDir, videoId }
+ * @returns {Promise<{primary: string, alternatives: string[], template: string}>}
+ */
+async function generateV99Thumbnail(hookText, options = {}) {
+  const { title, contentType, subjectImage, outputDir, videoId } = options;
+  const template = selectTemplate(hookText, contentType);
+  const headline = extractHeadline(hookText, title, 3); // Max 3 words for V99
+  const emoji = selectEmoji(template, hookText);
+
+  // Generate primary thumbnail
+  const primaryResult = await generateThumbnail(hookText, {
+    title,
+    contentType,
+    subjectImage,
+    outputDir,
+    videoId,
+  });
+
+  // Generate 2 additional variants with different templates
+  const allTemplates = ['breaking', 'reveal', 'shock', 'versus'];
+  const alternativeTemplates = allTemplates.filter(t => t !== template).slice(0, 2);
+
+  for (const altTemplate of alternativeTemplates) {
+    const altTag = altTemplate === 'breaking' ? 'BREAKING' : altTemplate === 'reveal' ? 'EXPOSED' : altTemplate === 'shock' ? 'SHOCKING' : 'VS';
+    const altEmoji = selectEmoji(altTemplate, hookText);
+    const altOutputDir = outputDir || path.join(RENDER_DIR, videoId || 'unknown');
+
+    try {
+      if (!fs.existsSync(altOutputDir)) fs.mkdirSync(altOutputDir, { recursive: true });
+      const altPath = path.join(altOutputDir, `thumbnail-${altTemplate}.jpg`);
+
+      // Use Remotion still for variant
+      const propsJson = JSON.stringify({
+        headline: headline.toUpperCase(),
+        template: altTemplate,
+        tag: altTag,
+        emoji: altEmoji,
+        subjectImage: subjectImage || null,
+      });
+
+      try {
+        execSync(
+          `npx remotion still --comp=ThumbnailComposition --output="${altPath}" --props='${propsJson.replace(/'/g, "\\'")}'`,
+          { timeout: 30000, stdio: 'pipe', cwd: ROOT_DIR }
+        );
+        if (fs.existsSync(altPath)) {
+          primaryResult.alternatives = primaryResult.alternatives || [];
+          primaryResult.alternatives.push(altPath);
+        }
+      } catch (_) {
+        // Variant generation is optional, skip silently
+      }
+    } catch (_) {}
+  }
+
+  return {
+    ...primaryResult,
+    template,
+    emoji,
+    variantCount: 1 + (primaryResult.alternatives || []).length,
+  };
+}
+
 module.exports = {
   generateThumbnail,
+  generateV99Thumbnail,
   selectTemplate,
   extractHeadline,
+  selectEmoji,
 };
