@@ -1780,7 +1780,7 @@ function buildHookHeadline(topic, topicContext = null, payload = {}) {
       : topic;
   const preferredLead = selectBestHookLead(baseSource, topic);
   const lead = String(preferredLead || '').split(/\(|\?|!/)[0].trim();
-  return finalizeHookPhrase(lead || topic, 7);
+  return finalizeHookPhrase(lead || topic, 12);
 }
 
 function buildHookPackage(topic, payload = {}, contentProfile = null, topicContext = null) {
@@ -1807,23 +1807,31 @@ function buildHookPackage(topic, payload = {}, contentProfile = null, topicConte
     };
   }
 
-  const angleLabel = topicContext && topicContext.angleLabel ? topicContext.angleLabel : 'LIVE CONTEXT';
-  const badge = topicContext && topicContext.packageBadge ? topicContext.packageBadge : 'REAL CONTEXT';
+  // L99: Topic-aware badge and subline instead of generic templates
+  const topicWords = String(topic || '').split(/\s+/).slice(0, 3).join(' ').toUpperCase();
+  const categoryBadge = topicContext && topicContext.category === 'ai_news' ? 'AI UPDATE'
+    : topicContext && topicContext.category === 'geopolitical_news' ? 'BREAKING'
+    : topicContext && topicContext.category === 'trending' ? 'TRENDING NOW'
+    : 'BREAKING';
+  const angleLabel = topicContext && topicContext.angleLabel ? topicContext.angleLabel : categoryBadge;
+  const badge = topicContext && topicContext.packageBadge ? topicContext.packageBadge : categoryBadge;
+
+  // L99: Generate a topic-specific subline instead of generic template
   const subline = topicContext && topicContext.hookSeed
     ? topicContext.hookSeed
-    : 'Real visuals first. Fast context. No filler.';
+    : `${topicWords} — Watch before everyone else.`;
 
   return {
     accent: contentProfile && contentProfile.isNews ? 'news' : 'general',
     badge: angleLabel,
-    headline: finalizeHookPhrase(hookHeadline, 7),
+    headline: hookHeadline,
     subline,
-    showUntilFrame: 42,
+    showUntilFrame: 48,
     persistentBadge: badge,
     showSourceChip: Boolean(contentProfile && contentProfile.isNews),
     closingCtaText: buildNewsValuePromiseCta(topicContext),
     loopBadge: badge,
-    loopHeadline: finalizeHookPhrase(hookHeadline, 5),
+    loopHeadline: finalizeHookPhrase(hookHeadline, 7),
     powerText,
   };
 }
@@ -3829,24 +3837,28 @@ async function resolveSceneMedia(scene, sceneIndex, recoveryLog, mediaSession = 
   const usedMediaKeys = mediaSession.usedMediaKeys || new Set();
 
   if (contentProfile && contentProfile.editorialFirst) {
-    const editorialQueries = buildEditorialSearchPack(scene, mediaSession.topic || '', contentProfile, sceneIndex);
-    // Only try Wikimedia for scenes with strong entity/country matches (first 3 queries are scene-specific)
-    // For generic scenes without specific entities, skip to Pexels/Pixabay stock which has richer variety
-    const hasStrongEditorial = editorialQueries.length > 0 && editorialQueries.some((q) =>
-      /portrait|speaking|official|parliament|capitol|palace|kremlin|white house|skyline|flag|military|summit|assembly|mosque|temple|church|cathedral|tower|monument/i.test(q)
-    );
-    if (hasStrongEditorial) {
-      // Only try the top 2 editorial queries to avoid exhausting weak matches
-      const topEditorial = editorialQueries.slice(0, 2);
-      for (const query of topEditorial) {
-        try {
-          const commonsMedia = await searchWikimediaCommonsImage(query, sceneIndex, usedMediaKeys, mediaSession);
-          recoveryLog.push(
-            `Scene ${sceneIndex + 1}: Tier 0 (Wikimedia Editorial Image) resolved query "${query}" before stock fallback.`
-          );
-          return commonsMedia;
-        } catch (queryError) {
-          tierFailures.push({tier: 'Tier 0 (Wikimedia Editorial Image)', error: queryError});
+    // L99: Alternate even-numbered scenes to prefer Pexels video for motion variety
+    // Odd scenes (1,3,5,7) → try Wikimedia editorial first (real photos of real events)
+    // Even scenes (2,4,6,8) → skip Wikimedia, go straight to Pexels video for motion
+    const preferVideoForThisScene = !contentProfile.isStory && sceneIndex % 2 === 1;
+
+    if (!preferVideoForThisScene) {
+      const editorialQueries = buildEditorialSearchPack(scene, mediaSession.topic || '', contentProfile, sceneIndex);
+      const hasStrongEditorial = editorialQueries.length > 0 && editorialQueries.some((q) =>
+        /portrait|speaking|official|parliament|capitol|palace|kremlin|white house|skyline|flag|military|summit|assembly|mosque|temple|church|cathedral|tower|monument/i.test(q)
+      );
+      if (hasStrongEditorial) {
+        const topEditorial = editorialQueries.slice(0, 2);
+        for (const query of topEditorial) {
+          try {
+            const commonsMedia = await searchWikimediaCommonsImage(query, sceneIndex, usedMediaKeys, mediaSession);
+            recoveryLog.push(
+              `Scene ${sceneIndex + 1}: Tier 0 (Wikimedia Editorial Image) resolved query "${query}" before stock fallback.`
+            );
+            return commonsMedia;
+          } catch (queryError) {
+            tierFailures.push({tier: 'Tier 0 (Wikimedia Editorial Image)', error: queryError});
+          }
         }
       }
     }
