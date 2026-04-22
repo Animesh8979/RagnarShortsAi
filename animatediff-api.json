@@ -98,7 +98,10 @@
     "inputs": {
       "samples": ["6", 0],
       "vae": ["1", 2],
-      "tile_size": 256
+      "tile_size": 256,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
     }
   },
   "8": {
