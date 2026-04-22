@@ -1,4 +1,4 @@
-﻿/**
+/**
  * image-providers.js - AI image generation fallback chain
  *
  * Story mode uses these providers to create illustrated frames before stock.
@@ -14,11 +14,38 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
 const {GoogleGenerativeAI} = require('@google/generative-ai');
+const {
+  getProviderState,
+  recordProviderFailure,
+  recordProviderSuccess,
+} = require('./provider-access');
+const { generateForgeProvider } = require('./forge-image-provider');
 
 const IMAGE_TIMEOUT_MS = 60000;
 const CACHE_DIR = path.join(__dirname, 'public', 'v12-cache');
 const HF_SDXL_MODEL = process.env.HF_SDXL_MODEL || 'stabilityai/stable-diffusion-xl-base-1.0';
 const { generateStillFrame } = require('./comfyui-bridge');
+// PATCH 2026-04-13: This was referenced at line 280 but never defined, crashing every HF SDXL call.
+const DEFAULT_NEGATIVE_PROMPT = '(worst quality, low quality:1.4), (deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation, watermark, text, signature, lowres, overprocessed, cgi, 3d render, plastic, jpeg artifacts, comic, illustration';
+
+function getHuggingFaceApiKey() {
+  return String(process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || '').trim();
+}
+
+function getHuggingFaceState(options = {}) {
+  return getProviderState('huggingface', {
+    mode: options.providerMode,
+    requireRemote: true,
+  });
+}
+
+function describeProviderBlock(state) {
+  if (!state) return 'provider is unavailable';
+  if (state.disabledByMode) return `provider disabled for mode=${state.mode}`;
+  if (!state.configured) return 'token not configured';
+  if (state.lastFailureReason) return `cooldown active after ${state.lastFailureReason}`;
+  return 'provider circuit is open';
+}
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -117,7 +144,7 @@ function buildImagePrompt(prompt, options = {}) {
       : 'Signature-owned digital newsroom presenter for Ragnar.';
     const characterDesign = options.characterLock ? `Character design lock: ${options.characterLock}.` : '';
     return [
-      'Vertical 9:16 photoreal presenter portrait for premium short-form video.',
+      'Vertical 9:16 photoreal presenter portrait for premium short-form video. 85mm portrait lens, ultra-sharp focus, highly detailed face, professional studio lighting, 8k resolution masterpiece.',
       roleLabel,
       characterDesign,
       'Recurring channel anchor identity, preserve the same facial structure, hair, and grooming across episodes.',
@@ -141,7 +168,7 @@ function buildImagePrompt(prompt, options = {}) {
     const seriesLabel = options.seriesTitle ? `Series title: ${options.seriesTitle}.` : 'Fictional Hindi short story.';
     const characterDesign = options.characterLock ? `PROTAGONIST DESIGN: ${options.characterLock}.` : '';
     return [
-      'Vertical 9:16 cinematic photoreal frame for a fictional short-form suspense story.',
+      'Vertical 9:16 cinematic photoreal frame for a fictional short-form suspense story. 8k resolution, ultra-detailed masterpiece, hyper-realistic Unreal Engine 5 render, award-winning cinematography.',
       'Feels like a premium OTT thriller still, not stock footage, concept art, anime, cartoon art, 3D render, or generic AI slop.',
       seriesLabel,
       `Mood: ${moodLabel}.`,
@@ -152,7 +179,7 @@ function buildImagePrompt(prompt, options = {}) {
     ].filter(Boolean).join(' ');
   }
 
-  return `Cinematic vertical 9:16 photograph, ${scenePrompt}, dramatic editorial lighting, shallow depth of field, photojournalistic style, 4K quality, film grain, no text, no watermark`;
+  return `Cinematic vertical 9:16 photograph, ${scenePrompt}, dramatic editorial lighting, shallow depth of field, photojournalistic style, 8K ultra-detailed masterpiece, highly detailed face, film grain, no text, no watermark`;
 }
 
 async function generateGeminiImagen() {
@@ -190,24 +217,32 @@ async function fetchPollinationsImage(url, sceneIndex, providerSlug, providerLab
 }
 
 async function generatePollinationsUnified(prompt, sceneIndex, options = {}) {
-  const requestPrompt = buildImagePrompt(prompt, options);
+  const requestPrompt = buildImagePrompt(prompt, options).slice(0, 800);
   const encoded = encodeURIComponent(requestPrompt);
-  const url = `https://gen.pollinations.ai/image/${encoded}${getPollinationsAuthQuery()}`;
-  return fetchPollinationsImage(url, sceneIndex, 'pollinations-unified', 'Pollinations Unified API', requestPrompt, options);
+  const { width, height } = getTargetDimensions(options);
+  const modelParam = process.env.POLLINATIONS_MODEL || 'seedream';
+  const url = `https://image.pollinations.ai/prompt/${encoded}${getPollinationsAuthQuery()}&width=${width}&height=${height}&model=${encodeURIComponent(modelParam)}&nologo=true`;
+  return fetchPollinationsImage(url, sceneIndex, 'pollinations-unified', `Pollinations Unified (${modelParam})`, requestPrompt, options);
 }
 
 async function generatePollinationsOpen(prompt, sceneIndex, options = {}) {
-  const requestPrompt = buildImagePrompt(prompt, options);
+  const requestPrompt = buildImagePrompt(prompt, options).slice(0, 800);
   const encoded = encodeURIComponent(requestPrompt);
   const authQuery = getPollinationsAuthQuery();
   const separator = authQuery ? '&' : '?';
-  const url = `https://pollinations.ai/p/${encoded}${authQuery}${separator}seed=${deriveSeed(requestPrompt, sceneIndex, options)}`;
-  return fetchPollinationsImage(url, sceneIndex, 'pollinations-open', 'Pollinations Open Image', requestPrompt, options);
+  const { width, height } = getTargetDimensions(options);
+  const modelParam = process.env.POLLINATIONS_MODEL || 'seedream';
+  const url = `https://image.pollinations.ai/prompt/${encoded}${authQuery}${separator}seed=${deriveSeed(requestPrompt, sceneIndex, options)}&width=${width}&height=${height}&model=${encodeURIComponent(modelParam)}&nologo=true`;
+  return fetchPollinationsImage(url, sceneIndex, 'pollinations-open', `Pollinations Open (${modelParam})`, requestPrompt, options);
 }
 
 async function generateHFFlux(prompt, sceneIndex, options = {}) {
-  const apiKey = process.env.HUGGINGFACE_API_KEY;
-  if (!apiKey) throw new Error('HUGGINGFACE_API_KEY not set');
+  const providerState = getHuggingFaceState(options);
+  if (providerState.blocked) {
+    return { softSkipReason: `Hugging Face skipped - ${describeProviderBlock(providerState)}` };
+  }
+  const apiKey = getHuggingFaceApiKey();
+  if (!apiKey) return { softSkipReason: 'Hugging Face skipped - token not configured' };
   const requestPrompt = buildImagePrompt(prompt, options);
   const { width, height } = getTargetDimensions(options);
 
@@ -245,15 +280,23 @@ async function generateHFFlux(prompt, sceneIndex, options = {}) {
     const filePath = path.join(CACHE_DIR, fileName);
     fs.writeFileSync(filePath, buffer);
 
+    recordProviderSuccess('huggingface', { mode: options.providerMode });
     return { src: `v12-cache/${fileName}`, provider: 'HF FLUX.1-schnell' };
+  } catch (error) {
+    recordProviderFailure('huggingface', error, { mode: options.providerMode });
+    throw error;
   } finally {
     clearTimeout(timer);
   }
 }
 
 async function generateHFSDXL(prompt, sceneIndex, options = {}) {
-  const apiKey = process.env.HUGGINGFACE_API_KEY;
-  if (!apiKey) throw new Error('HUGGINGFACE_API_KEY not set');
+  const providerState = getHuggingFaceState(options);
+  if (providerState.blocked) {
+    return { softSkipReason: `Hugging Face skipped - ${describeProviderBlock(providerState)}` };
+  }
+  const apiKey = getHuggingFaceApiKey();
+  if (!apiKey) return { softSkipReason: 'Hugging Face skipped - token not configured' };
   const requestPrompt = buildImagePrompt(prompt, options);
   const { width, height } = getTargetDimensions(options);
 
@@ -296,13 +339,125 @@ async function generateHFSDXL(prompt, sceneIndex, options = {}) {
     const fileName = buildCacheFileName(sceneIndex, 'hf-sdxl', requestPrompt, extension, options);
     fs.writeFileSync(path.join(CACHE_DIR, fileName), buffer);
 
+    recordProviderSuccess('huggingface', { mode: options.providerMode });
     return { src: `v12-cache/${fileName}`, provider: 'HF SDXL' };
+  } catch (error) {
+    recordProviderFailure('huggingface', error, { mode: options.providerMode });
+    throw error;
   } finally {
     clearTimeout(timer);
   }
 }
 
-// ComfyUI local wrapper â€” adapts generateStoryFrame to the provider interface
+/// ──────────────────────────────────────────────
+// Gemini Flash Image Generator (FREE via existing GEMINI_API_KEY)
+// ──────────────────────────────────────────────
+
+// Cinema-director prompt enhancer — transforms generic prompts into scroll-stopping visuals
+const CAMERA_ANGLES = ['dramatic low angle', 'cinematic close-up', 'wide establishing shot', 'dutch angle', 'overhead bird\'s eye', 'medium shot with depth'];
+const LIGHTING_SETUPS = ['Rembrandt lighting with deep shadows', 'golden hour backlight with lens flare', 'neon-lit urban glow', 'moody teal and orange color grade', 'harsh spotlight with rim light', 'soft diffused overcast'];
+const LENS_FEELS = ['shallow depth of field f/1.4', 'anamorphic lens flare', 'telephoto compression', 'wide-angle environmental', '85mm portrait lens'];
+
+function isEditorialAiImageDisabled(options = {}) {
+  return Boolean(options.editorialMode && !options.avatarMode && !options.allowIllustrativeFallback);
+}
+
+function buildVisionJudgePrompt(requestPrompt, options = {}) {
+  const editorialMode = Boolean(options.editorialMode || options.newsMode);
+  const avatarMode = Boolean(options.avatarMode);
+  const contextPrompt = String(requestPrompt || '').replace(/\s+/g, ' ').trim().slice(0, 280);
+
+  const rules = [
+    'Act as a strict visual QA editor.',
+    'Return exactly one word: ACCEPT or REJECT.',
+    'Reject any image with severe hand/face deformities, duplicate people, gibberish text, watermarks, logos, or chaotic AI mesh artifacts.',
+    contextPrompt ? `Requested visual brief: ${contextPrompt}.` : '',
+  ];
+
+  if (editorialMode && !avatarMode) {
+    rules.push('This image is intended for a NEWS/editorial scene.');
+    rules.push('Reject sketches, drawings, anime, cartoon art, comic art, stylized illustrations, fake posters, concept art, empty mood art, or generic abstract filler.');
+    rules.push('Reject obviously irrelevant imagery that does not plausibly match the requested editorial brief.');
+    rules.push('Only accept photoreal editorial-looking visuals or clean presenter/explainer imagery.');
+  } else if (!avatarMode) {
+    rules.push('Reject low-production-value images that look cheap, muddy, or incoherent.');
+  }
+
+  if (avatarMode) {
+    rules.push('This is a presenter/avatar portrait, so direct eye-contact portraits are acceptable if realistic and premium.');
+  }
+
+  return rules.filter(Boolean).join(' ');
+}
+
+function cinemaDirectorEnhance(rawPrompt, sceneIndex, options = {}) {
+  const angle = CAMERA_ANGLES[sceneIndex % CAMERA_ANGLES.length];
+  const lighting = LIGHTING_SETUPS[(sceneIndex + 2) % LIGHTING_SETUPS.length];
+  const lens = LENS_FEELS[(sceneIndex + 1) % LENS_FEELS.length];
+  
+  const moodTag = options.mood === 'story_calm' 
+    ? 'melancholic atmospheric tension' 
+    : options.storyMode ? 'high-stakes thriller intensity' : 'urgent newsroom energy';
+  
+  return [
+    `Cinematic vertical 9:16 composition, ${angle}.`,
+    rawPrompt,
+    `${lighting}, ${lens}.`,
+    `Mood: ${moodTag}.`,
+    'Ultra-detailed photorealism, film grain, no text, no watermark, no logos, no collage, clean composition.',
+    options.characterLock ? `Character design: ${options.characterLock}.` : '',
+  ].filter(Boolean).join(' ');
+}
+
+async function generateGeminiFlashImage(prompt, sceneIndex, options = {}) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) throw new Error('GEMINI_API_KEY not set');
+
+  const rawPrompt = buildImagePrompt(prompt, options);
+  const enhancedPrompt = cinemaDirectorEnhance(rawPrompt, sceneIndex, options);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), IMAGE_TIMEOUT_MS);
+
+  try {
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image' });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: `Generate an image: ${enhancedPrompt}` }] }],
+      generationConfig: { responseModalities: ['image', 'text'] },
+    });
+
+    const candidate = result.response.candidates && result.response.candidates[0];
+    if (!candidate || !candidate.content || !candidate.content.parts) {
+      throw new Error('Gemini Flash Image returned no content');
+    }
+
+    // Find inline image data in response parts
+    for (const part of candidate.content.parts) {
+      if (part.inlineData && part.inlineData.data) {
+        const buffer = Buffer.from(part.inlineData.data, 'base64');
+        const mimeType = part.inlineData.mimeType || 'image/png';
+        const extension = mimeType.includes('png') ? '.png' : mimeType.includes('webp') ? '.webp' : '.jpg';
+
+        assertValidImageBuffer(buffer, 'Gemini Flash Image', mimeType);
+
+        ensureDir(CACHE_DIR);
+        const fileName = buildCacheFileName(sceneIndex, 'gemini-flash', enhancedPrompt, extension, options);
+        const filePath = path.join(CACHE_DIR, fileName);
+        fs.writeFileSync(filePath, buffer);
+
+        return { src: `v12-cache/${fileName}`, provider: 'Gemini Flash Image' };
+      }
+    }
+
+    throw new Error('Gemini Flash Image response contained no image data');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ComfyUI local wrapper — adapts generateStoryFrame to the provider interface
 async function generateComfyUILocal(prompt, sceneIndex, options = {}) {
   if (!options.storyMode && !options.avatarMode && options.visualIntent !== 'hero_frame') return null;
   const comfyuiBridge = require('./comfyui-bridge');
@@ -317,17 +472,18 @@ async function generateComfyUILocal(prompt, sceneIndex, options = {}) {
     mood: options.mood,
     avatarMode: Boolean(options.avatarMode),
     characterLock: options.characterLock || null,
+    // V104: forward cartoon intent so comfyui-bridge buildGenerationPrompt swaps the
+    // default photoreal wrapper for the anime wrapper (stills + motion).
+    cartoonMode: Boolean(options.cartoonMode || options.isCartoon),
+    isCartoon: Boolean(options.cartoonMode || options.isCartoon),
   });
   return result || { softSkipReason: 'ComfyUI returned no frame' };
 }
 
 const IMAGE_PROVIDERS = [
   { label: 'ComfyUI Local Still', fn: generateComfyUILocal },
-  {
-    label: 'Gemini Imagen 3',
-    fn: generateGeminiImagen,
-    disabledReason: 'Imagen 3 direct API path is disabled here; Vertex AI-only flow is not wired into this pipeline.',
-  },
+  { label: 'Forge Local Still', fn: generateForgeProvider },
+  { label: 'Gemini Flash Image', fn: generateGeminiFlashImage },
   { label: 'HF SDXL', fn: generateHFSDXL },
   { label: 'HF FLUX.1-schnell', fn: generateHFFlux },
   { label: 'Pollinations Open Image', fn: generatePollinationsOpen },
@@ -348,11 +504,12 @@ function isPermanentProviderFailure(message) {
 function getProviderRunOrder(options = {}) {
   const priority = {
     'ComfyUI Local Still': 0,
-    'HF SDXL': 1,
-    'HF FLUX.1-schnell': 2,
-    'Pollinations Open Image': 3,
-    'Pollinations Unified API': 4,
-    'Gemini Imagen 3': 5,
+    'Forge Local Still': 1,
+    'Gemini Flash Image': 2,
+    'HF SDXL': 3,
+    'HF FLUX.1-schnell': 4,
+    'Pollinations Open Image': 5,
+    'Pollinations Unified API': 6,
   };
 
   return [...IMAGE_PROVIDERS].sort((left, right) => {
@@ -364,6 +521,10 @@ function getProviderRunOrder(options = {}) {
 
 async function generateAIImage(prompt, sceneIndex, recoveryLog = [], options = {}) {
   const providerHealth = options.providerHealth || null;
+  if (isEditorialAiImageDisabled(options)) {
+    recoveryLog.push(`Scene ${sceneIndex + 1}: AI image generation disabled for editorial/news visuals.`);
+    return null;
+  }
 
   for (const provider of getProviderRunOrder(options)) {
     if (options.localOnly && provider.label !== 'ComfyUI Local Still') {
@@ -411,20 +572,22 @@ async function generateAIImage(prompt, sceneIndex, recoveryLog = [], options = {
       if (geminiKey) {
         try {
           const genAI = new GoogleGenerativeAI(geminiKey);
-          const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+          // V104: env override — free-tier keys only accept flash-lite (vision capable).
+          const judgeModel = process.env.GEMINI_VISION_JUDGE_MODEL || process.env.VISUAL_AUDIT_MODEL || 'gemini-2.5-flash-lite';
+          const model = genAI.getGenerativeModel({ model: judgeModel });
           const imagePath = path.join(__dirname, 'public', result.src);
           const imageData = fs.readFileSync(imagePath).toString('base64');
           const imageMimeType = /\.png$/i.test(imagePath) ? 'image/png' : /\.webp$/i.test(imagePath) ? 'image/webp' : 'image/jpeg';
-          const prompt = "Act as a strict photo editor. Does this image have severely deformed hands, horrible text/watermarks, or chaotic mesh artifacts? If YES return REJECT. Else return ACCEPT. Be decisive.";
+          const judgePrompt = buildVisionJudgePrompt(prompt, options);
           
           const aiResponse = await model.generateContent([
-            prompt, 
+            judgePrompt,
             { inlineData: { data: imageData, mimeType: imageMimeType } }
           ]);
           
-          const textRes = aiResponse.response.text();
-          if (textRes.includes('REJECT')) {
-              recoveryLog.push(`Scene ${sceneIndex + 1}: AI Judge REJECTED image from ${provider.label} due to deformities.`);
+          const textRes = String(aiResponse.response.text() || '').toUpperCase();
+          if (textRes.includes('REJECT') || !textRes.includes('ACCEPT')) {
+              recoveryLog.push(`Scene ${sceneIndex + 1}: AI Judge REJECTED image from ${provider.label} due to quality/editorial mismatch.`);
               continue; // Reject and try the next provider
           }
         } catch (visionErr) {
@@ -448,4 +611,3 @@ async function generateAIImage(prompt, sceneIndex, recoveryLog = [], options = {
 }
 
 module.exports = { generateAIImage, IMAGE_PROVIDERS };
-
