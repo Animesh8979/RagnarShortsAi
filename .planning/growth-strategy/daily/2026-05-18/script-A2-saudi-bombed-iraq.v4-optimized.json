@@ -1,0 +1,99 @@
+{
+  "sourceFile": ".planning/growth-strategy/daily/2026-05-18/script-A2-saudi-bombed-iraq.json",
+  "optimizedAt": "2026-05-18T13:28:27.899Z",
+  "module": "V4 Module 9",
+  "llmProvider": "groq",
+  "validation": {
+    "ok": true,
+    "gates": {
+      "schema": {
+        "ok": true,
+        "missing": []
+      },
+      "beatStructure": {
+        "ok": true,
+        "beatCount": 5
+      },
+      "firstSentence": {
+        "ok": true,
+        "syllables": 5,
+        "words": 3,
+        "endsOnConnector": false,
+        "text": "SAUDI bombs Iraq"
+      },
+      "finalSentence": {
+        "ok": true,
+        "text": "What's Washington's next move, after SAUDI?"
+      },
+      "loopReference": {
+        "ok": true,
+        "loopReference": "SAUDI"
+      },
+      "wordCount": {
+        "ok": true,
+        "words": 139,
+        "ideal": "155-175",
+        "accepted": "100-185",
+        "belowIdeal": true
+      },
+      "duration": {
+        "ok": null,
+        "skipped": true
+      }
+    }
+  },
+  "original": {
+    "title": "Saudi Arabia Just Bombed Iraq",
+    "hook": "Saudi Arabia Just Bombed Iraq",
+    "words": 155
+  },
+  "optimized": {
+    "title": "SAUDI BOMBS IRAQ",
+    "hook": "SAUDI BOMBS IRAQ",
+    "fullVoiceover": "SAUDI bombs Iraq. The Middle East just split in half. Saudi fighter jets struck Iran-backed militia positions inside Iraq in May 2026. Kuwait launched rocket strikes too. The Gulf is at war — and the US isn't leading it. Riyadh moved without Washington's lead. Mohammed bin Salman ordered it solo. Sunni Arabia and Shia Iran are now fighting through proxies on Iraqi soil — and neither country has publicly acknowledged the strikes. Oil at $140 isn't the ceiling. Saudi production is down. Iraqi oil fields are now contested. India imports 40% of crude from these two countries combined. If Saudi pulls more forces toward Iraq, the Gulf War your parents watched plays out again — but this time the players are smaller, the proxies are everywhere, and the US is sitting it out. What's Washington's next move, after SAUDI?",
+    "beats": [
+      {
+        "tStart": 0,
+        "tEnd": 3,
+        "vo": "SAUDI bombs Iraq. The Middle East just split in half.",
+        "visualPrompt": "Snap zoom on 'SAUDI' word, map of Middle East splitting"
+      },
+      {
+        "tStart": 3,
+        "tEnd": 8,
+        "vo": "Saudi fighter jets struck Iran-backed militia positions inside Iraq in May 2026. Kuwait launched rocket strikes too.",
+        "visualPrompt": "Quick cuts: F-15 fighter jets, Iraqi desert military positions, Kuwait skyline"
+      },
+      {
+        "tStart": 8,
+        "tEnd": 14,
+        "vo": "Riyadh moved without Washington's lead. Mohammed bin Salman ordered it solo. Sunni Arabia and Shia Iran are now fighting through proxies on Iraqi soil — and neither country has publicly acknowledged the strikes.",
+        "visualPrompt": "MBS news photo, Saudi royal palace, Iranian Quds Force imagery"
+      },
+      {
+        "tStart": 14,
+        "tEnd": 21,
+        "vo": "Oil at $140 isn't the ceiling. Saudi production is down. Iraqi oil fields are now contested. India imports 40% of crude from these two countries combined.",
+        "visualPrompt": "Animated stat cards: 'OIL $140 — NOT CEILING', 'SAUDI PRODUCTION ↓', 'IRAQI FIELDS CONTESTED'"
+      },
+      {
+        "tStart": 21,
+        "tEnd": 28,
+        "vo": "If Saudi pulls more forces to Iraq, the Gulf War your parents watched plays out again — but this time the players are smaller, the proxies are everywhere, and the US is sitting it out. What's Washington's next move, after SAUDI?",
+        "visualPrompt": "Archival 1991 Gulf War B-roll cross-faded with modern 2026 footage, 'WHAT'S WASHINGTON'S MOVE?' overlay"
+      }
+    ],
+    "powerWords": [
+      "SAUDI",
+      "Iraq",
+      "Middle East",
+      "Mohammed bin Salman",
+      "Sunni",
+      "Shia",
+      "India",
+      "Washington"
+    ],
+    "loopReference": "SAUDI",
+    "changesFromOriginal": "Rephrased for shorter sentences and more direct language"
+  }
+}

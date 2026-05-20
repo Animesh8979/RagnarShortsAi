@@ -10,6 +10,7 @@
 
 import { registerRoot, Composition } from 'remotion';
 import { A1HookScene } from './scenes/A1HookScene';
+import { V7OrganicComposition } from './scenes/V7OrganicComposition';
 
 const V7Root = () => {
   return (
@@ -18,6 +19,27 @@ const V7Root = () => {
         id="A1HookScene"
         component={A1HookScene}
         durationInFrames={75}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="V7OrganicComposition"
+        component={V7OrganicComposition}
+        calculateMetadata={({ props }) => {
+          const fps = 30;
+          const lastBeat = (props.beats || []).slice(-1)[0];
+          const dur = lastBeat ? Math.max(1, Math.round(lastBeat.toSec * fps)) : 960;
+          return { durationInFrames: dur, props };
+        }}
+        defaultProps={{
+          scriptId: 'demo',
+          audioFile: null,
+          beats: [],
+          wordBoundaries: [],
+          powerWords: [],
+          brand: 'RAGNAR — NEUTRAL NEWS',
+        }}
         fps={30}
         width={1080}
         height={1920}

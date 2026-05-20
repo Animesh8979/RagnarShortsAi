@@ -115,9 +115,56 @@ async function uploadTo0x0(filePath) {
   return text.trim();
 }
 
+/**
+ * Upload to Catbox (permanent free hosting, files.catbox.moe)
+ * Reliable when Litterbox / 0x0 are down.
+ */
+async function uploadToCatbox(filePath) {
+  const form = new FormData();
+  form.append('reqtype', 'fileupload');
+  form.append('fileToUpload', fs.createReadStream(filePath), {
+    filename: path.basename(filePath),
+    contentType: 'video/mp4',
+  });
+  const response = await fetch('https://catbox.moe/user/api.php', {
+    method: 'POST',
+    body: form,
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+  });
+  const text = await response.text();
+  if (!response.ok || !text.startsWith('http')) {
+    throw new Error(`Catbox upload failed (${response.status}): ${text.slice(0, 120)}`);
+  }
+  return text.trim();
+}
+
+/**
+ * Upload to tmpfiles.org (24h temp hosting)
+ */
+async function uploadToTmpfiles(filePath) {
+  const form = new FormData();
+  form.append('file', fs.createReadStream(filePath), {
+    filename: path.basename(filePath),
+    contentType: 'video/mp4',
+  });
+  const response = await fetch('https://tmpfiles.org/api/v1/upload', {
+    method: 'POST',
+    body: form,
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+  });
+  const data = await response.json();
+  if (!data || !data.data || !data.data.url) {
+    throw new Error(`tmpfiles upload failed: ${JSON.stringify(data).slice(0, 120)}`);
+  }
+  // tmpfiles returns a viewer URL like https://tmpfiles.org/12345/file.mp4 — convert to direct download.
+  return data.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+}
+
 const HOSTING_PROVIDERS = [
   { name: 'Litterbox (72h)', fn: uploadToLitterbox, multiFetchSafe: true },
+  { name: 'Catbox (permanent)', fn: uploadToCatbox, multiFetchSafe: true },
   { name: '0x0.st', fn: uploadTo0x0, multiFetchSafe: true },
+  { name: 'tmpfiles.org (24h)', fn: uploadToTmpfiles, multiFetchSafe: true },
   { name: 'file.io', fn: uploadToFileIo, multiFetchSafe: false },
 ];
 

@@ -1,0 +1,101 @@
+{
+  "sourceFile": ".planning/growth-strategy/daily/2026-05-18/script-A1-pakistan-picked-iran.json",
+  "optimizedAt": "2026-05-18T13:28:23.659Z",
+  "module": "V4 Module 9",
+  "llmProvider": "groq",
+  "validation": {
+    "ok": true,
+    "gates": {
+      "schema": {
+        "ok": true,
+        "missing": []
+      },
+      "beatStructure": {
+        "ok": true,
+        "beatCount": 5
+      },
+      "firstSentence": {
+        "ok": true,
+        "syllables": 6,
+        "words": 3,
+        "endsOnConnector": false,
+        "text": "Pakistan picks Iran"
+      },
+      "finalSentence": {
+        "ok": true,
+        "text": "So what does Washington do now, Pakistan?"
+      },
+      "loopReference": {
+        "ok": true,
+        "loopReference": "Pakistan"
+      },
+      "wordCount": {
+        "ok": true,
+        "words": 111,
+        "ideal": "155-175",
+        "accepted": "100-185",
+        "belowIdeal": true
+      },
+      "duration": {
+        "ok": null,
+        "skipped": true
+      }
+    }
+  },
+  "original": {
+    "title": "Pakistan Just Picked Iran's Side",
+    "hook": "Pakistan Just Picked Iran's Side",
+    "words": 131
+  },
+  "optimized": {
+    "title": "Pakistan Picks Iran",
+    "hook": "Pakistan Picks Iran",
+    "fullVoiceover": "Pakistan picks Iran. Pakistan just made the choice that breaks the Quad by opening six overland routes through Balochistan, bypassing the blockaded Strait of Hormuz entirely. Three thousand containers stuck at Karachi just got rerouted. Pakistan's military is securing the Gwadar-to-Gabd corridor. On February 2026, China and Pakistan chose to side with Iran, while the US is alone with Israel. India, however, is the only major economy buying from both sides. New Delhi just became the most important phone call in geopolitics. Modi can pressure Tehran or Washington and still extract concessions. Pakistan picked Iran, but India picked everyone, including the US and China. So what does Washington do now, Pakistan?",
+    "beats": [
+      {
+        "tStart": 0,
+        "tEnd": 3,
+        "vo": "Pakistan picks Iran. Pakistan just made the choice that breaks the Quad",
+        "visualPrompt": "Frame 0: single word 'PAKISTAN' centered 200pt Anton white on black, bass-drop SFX. Frame 12: snap-zoom on the word to 1.4x scale."
+      },
+      {
+        "tStart": 3,
+        "tEnd": 8,
+        "vo": "by opening six overland routes through Balochistan, bypassing the blockaded Strait of Hormuz entirely. Three thousand containers stuck at Karachi just got rerouted.",
+        "visualPrompt": "Animated map of South Asia. Six arrows from Karachi/Port Qasim overland through Balochistan to Iranian border crossings at Gabd and Taftan."
+      },
+      {
+        "tStart": 8,
+        "tEnd": 14,
+        "vo": "Pakistan's military is securing the Gwadar-to-Gabd corridor. On February 2026, China and Pakistan chose to side with Iran, while the US is alone with Israel.",
+        "visualPrompt": "Quick cuts: Pakistani military convoy in mountainous Balochistan terrain, Gwadar deep-sea port aerial, Gabd border crossing, satellite image of Balochistan region."
+      },
+      {
+        "tStart": 14,
+        "tEnd": 21,
+        "vo": "India, however, is the only major economy buying from both sides. New Delhi just became the most important phone call in geopolitics. Modi can pressure Tehran or Washington and still extract concessions.",
+        "visualPrompt": "Three vertical cards sliding in: 'CHINA+PAK+IRAN' (red), 'US+ISRAEL' (blue), 'INDIA — BOTH' (green pulsing)."
+      },
+      {
+        "tStart": 21,
+        "tEnd": 28,
+        "vo": "Pakistan picked Iran, but India picked everyone, including the US and China. So what does Washington do now, Pakistan?",
+        "visualPrompt": "Final overlay 'WHAT DOES WASHINGTON DO?' Cut back to opening 'PAKISTAN' word for replay loop. Bass-drop return."
+      }
+    ],
+    "powerWords": [
+      "Pakistan",
+      "Iran",
+      "Quad",
+      "China",
+      "US",
+      "Israel",
+      "India",
+      "Gwadar",
+      "Gabd",
+      "Modi"
+    ],
+    "loopReference": "Pakistan",
+    "changesFromOriginal": "Added more details on the implications for India and the US"
+  }
+}

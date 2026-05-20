@@ -1,9 +1,11 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const fetch = require('node-fetch');
 const {canAttempt, getCircuitState, recordCircuitFailure, recordCircuitSuccess} = require('./circuit-breaker');
 const {enqueueRecoveryItem} = require('./recovery-queue');
+const { assertPublishPermit } = require('./publish-lock');
 
 const API_VERSION = process.env.INSTAGRAM_API_VERSION || 'v24.0';
 const GRAPH_BASE = process.env.INSTAGRAM_GRAPH_BASE || 'https://graph.facebook.com';
@@ -15,21 +17,82 @@ const INSTAGRAM_CIRCUIT_KEY = 'instagram:publish';
 const INSTAGRAM_CIRCUIT_THRESHOLD = Math.max(1, Number(process.env.INSTAGRAM_CIRCUIT_THRESHOLD || 3));
 const INSTAGRAM_CIRCUIT_COOLDOWN_MS = Math.max(30000, Number(process.env.INSTAGRAM_CIRCUIT_COOLDOWN_MS || 30 * 60 * 1000));
 
-function getAccessToken() {
+// L107 P1.4: token/userId can be overridden per upload call so clipping vs
+// organic tracks can target different IG accounts in the future. Today both
+// tracks share vid1; the parameter still resolves correctly via the .env defaults.
+function getAccessToken(options = {}) {
+  if (options && options.accessToken) return String(options.accessToken);
+  const label = String((options && options.channelLabel) || '').toLowerCase();
+  if (label.includes('clip') && process.env.INSTAGRAM_ACCESS_TOKEN_CLIPS) return process.env.INSTAGRAM_ACCESS_TOKEN_CLIPS;
+  if ((label.includes('organic') || label === 'yt1') && process.env.INSTAGRAM_ACCESS_TOKEN_ORGANIC) return process.env.INSTAGRAM_ACCESS_TOKEN_ORGANIC;
   return process.env.INSTAGRAM_ACCESS_TOKEN || '';
 }
 
-function getInstagramUserId() {
+function getInstagramUserId(options = {}) {
+  if (options && options.userId) return String(options.userId);
+  const label = String((options && options.channelLabel) || '').toLowerCase();
+  if (label.includes('clip') && process.env.INSTAGRAM_USER_ID_CLIPS) return process.env.INSTAGRAM_USER_ID_CLIPS;
+  if ((label.includes('organic') || label === 'yt1') && process.env.INSTAGRAM_USER_ID_ORGANIC) return process.env.INSTAGRAM_USER_ID_ORGANIC;
   return process.env.INSTAGRAM_USER_ID || '';
 }
 
-function isInstagramConfigured() {
-  return Boolean(getAccessToken() && getInstagramUserId());
+function isInstagramConfigured(options = {}) {
+  return Boolean(getAccessToken(options) && getInstagramUserId(options));
 }
 
-function ensureConfigured() {
-  if (!getAccessToken()) throw new Error('INSTAGRAM_ACCESS_TOKEN is missing.');
-  if (!getInstagramUserId()) throw new Error('INSTAGRAM_USER_ID is missing.');
+function ensureConfigured(options = {}) {
+  if (!getAccessToken(options)) throw new Error('INSTAGRAM_ACCESS_TOKEN is missing (or INSTAGRAM_ACCESS_TOKEN_<track> for the targeted track).');
+  if (!getInstagramUserId(options)) throw new Error('INSTAGRAM_USER_ID is missing (or INSTAGRAM_USER_ID_<track>).');
+}
+
+function getFfmpeg() {
+  try {
+    return require('ffmpeg-static');
+  } catch (_) {
+    return 'ffmpeg';
+  }
+}
+
+function optimizeVideoForInstagram(inputPath, options = {}) {
+  if (options.skipOptimization === true || process.env.INSTAGRAM_SKIP_TRANSCODE === '1') {
+    return inputPath;
+  }
+  const parsed = path.parse(inputPath);
+  if (/-instagram$/i.test(parsed.name)) {
+    return inputPath;
+  }
+  const outputPath = path.join(parsed.dir, `${parsed.name}-instagram.mp4`);
+  if (fs.existsSync(outputPath) && fs.statSync(outputPath).mtimeMs >= fs.statSync(inputPath).mtimeMs && fs.statSync(outputPath).size > 1024 * 1024) {
+    return outputPath;
+  }
+
+  console.log('   Preparing Instagram-safe MP4 (1080x1920, yuv420p, AAC, faststart)...');
+  execFileSync(getFfmpeg(), [
+    '-hide_banner',
+    '-loglevel', 'error',
+    '-nostdin',
+    '-y',
+    '-i', inputPath,
+    '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,format=yuv420p',
+    '-r', '30',
+    '-c:v', 'libx264',
+    '-profile:v', 'high',
+    '-level:v', '4.1',
+    '-preset', 'medium',
+    '-crf', '20',
+    '-pix_fmt', 'yuv420p',
+    '-color_range', 'tv',
+    '-colorspace', 'bt709',
+    '-color_primaries', 'bt709',
+    '-color_trc', 'bt709',
+    '-c:a', 'aac',
+    '-b:a', '160k',
+    '-ar', '44100',
+    '-ac', '2',
+    '-movflags', '+faststart',
+    outputPath,
+  ], { cwd: process.cwd(), stdio: 'inherit', windowsHide: true });
+  return outputPath;
 }
 
 function buildGraphUrl(resourcePath) {
@@ -246,15 +309,19 @@ async function testInstagramAuth() {
 }
 
 async function uploadToInstagram(videoPath, caption, options = {}) {
+  if (!options.skipPermitCheck) {
+    assertPublishPermit(options, { platform: 'instagram_reels', videoPath });
+  }
   ensureConfigured();
+  const instagramVideoPath = optimizeVideoForInstagram(videoPath, options);
   if (!canAttempt(INSTAGRAM_CIRCUIT_KEY)) {
     const circuit = getCircuitState(INSTAGRAM_CIRCUIT_KEY);
     const error = `Instagram circuit open for about ${Math.ceil(Math.max(0, circuit.blockedUntilMs - Date.now()) / 1000)}s`;
     enqueueRecoveryItem({
       type: 'instagram_upload',
-      key: `instagram:${path.basename(videoPath)}`,
+      key: `instagram:${path.basename(instagramVideoPath)}`,
       label: 'Instagram upload deferred',
-      renderPath: videoPath,
+      renderPath: instagramVideoPath,
       error,
     });
     return {
@@ -265,21 +332,21 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
     };
   }
 
-  const stat = fs.statSync(videoPath);
+  const stat = fs.statSync(instagramVideoPath);
   if (stat.size > 1024 * 1024 * 1024) {
     throw new Error('Instagram upload aborted: file exceeds 1 GB.');
   }
 
   const fileSizeMb = (stat.size / (1024 * 1024)).toFixed(2);
   console.log('\nIG Instagram Upload Starting...');
-  console.log(`   File: ${path.basename(videoPath)} (${fileSizeMb} MB)`);
+  console.log(`   File: ${path.basename(instagramVideoPath)} (${fileSizeMb} MB)`);
 
   const attempts = Math.max(1, Number(options.retryAttempts) || DEFAULT_RETRY_ATTEMPTS);
   let lastError = null;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const staged = await stageVideoForInstagram(videoPath, options);
+      const staged = await stageVideoForInstagram(instagramVideoPath, options);
       console.log(`   Public file: ${staged.publicFileName}`);
       console.log(`   Public URL: ${staged.publicVideoUrl}`);
 
@@ -335,9 +402,9 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
 
   enqueueRecoveryItem({
     type: 'instagram_upload',
-    key: `instagram:${path.basename(videoPath)}`,
+    key: `instagram:${path.basename(instagramVideoPath)}`,
     label: 'Instagram upload failed',
-    renderPath: videoPath,
+    renderPath: instagramVideoPath,
     error: String(lastError && lastError.message ? lastError.message : lastError || 'Instagram upload failed'),
   });
 
