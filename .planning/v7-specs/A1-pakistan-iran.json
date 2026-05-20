@@ -1,0 +1,157 @@
+{
+  "scriptId": "A1-pakistan-iran",
+  "title": "Pakistan Just Picked Iran's Side",
+  "tts_rate": "+50%",
+  "approx_duration_sec": 32,
+  "beats": [
+    {
+      "beatId": "hook",
+      "duration_seconds": 2.5,
+      "voiceover": "Pakistan just made the choice that breaks the Quad.",
+      "camera": {
+        "type": "dolly+pan",
+        "from": { "position": [0, 0.4, 9], "lookAt": [0, 0.4, 0] },
+        "to":   { "position": [0, -0.2, 5.5], "lookAt": [0, 0.5, 0] },
+        "fov": 28,
+        "easing": "cubicInOut"
+      },
+      "lighting": {
+        "key":     { "position": [3.5, 4, 5], "color": "#FFD200", "intensity": 2.4, "decay": 1 },
+        "fill":    { "position": [-4, 2, 3], "color": "#1E90FF", "intensity": 0.45 },
+        "rim":     { "position": [0, 0.5, -5], "color": "#FFFFFF", "intensity": 1.8 },
+        "ambient": { "color": "#070713", "intensity": 0.18 }
+      },
+      "geometry": {
+        "primary": "Text3D 'PAKISTAN' with Anton font, height 1.4 units, bevel 0.04, depth 0.5",
+        "secondary": "Faint flag accent: animated SVG-on-plane (Pakistan green crescent) ghosting at 12% opacity behind type",
+        "particles": { "count": 240, "kind": "dust-motes", "size_range": [0.008, 0.04], "behavior": "slow upward parallax drift, attenuated by light proximity" },
+        "background": "Starfield via drei Stars, radius 80, depth 30, fade enabled; dark navy gradient floor receding"
+      },
+      "materials": {
+        "type": { "kind": "MeshPhysicalMaterial", "metalness": 0.85, "roughness": 0.22, "color": "#F4F4F0", "emissive": "#FFD200", "emissiveIntensity": 0.18, "clearcoat": 0.5, "clearcoatRoughness": 0.2 }
+      },
+      "color_palette": {
+        "primary":     "#F4F4F0",
+        "warm_money":  "#FFD200",
+        "cool_fill":   "#1E90FF",
+        "danger":      "#DC143C",
+        "bg_low":      "#04060C",
+        "bg_mid":      "#0A0A1F"
+      },
+      "post": {
+        "dof":       { "focusDistance": 0.05, "focalLength": 0.04, "bokehScale": 4.0 },
+        "bloom":     { "intensity": 0.55, "luminanceThreshold": 0.78, "radius": 0.6 },
+        "vignette":  { "offset": 0.35, "darkness": 0.5 },
+        "chromaAb":  { "offset": [0.0009, 0.0009] },
+        "noise":     { "opacity": 0.05 }
+      },
+      "mood": "ominous breaking news; the world just shifted; journalistic gravitas",
+      "reference": "Cleo Abram — 'How AI broke YouTube' hook frame: 3D type emerging from dark backdrop, dust motes catching key light"
+    },
+    {
+      "beatId": "establishing",
+      "duration_seconds": 3.0,
+      "voiceover": "Here's why this matters more than you think.",
+      "camera": { "type": "slow-push", "from": { "position": [0, 0.5, 7] }, "to": { "position": [0, 0.5, 5] }, "fov": 35 },
+      "lighting": {
+        "key": { "position": [-3, 5, 4], "color": "#FFA040", "intensity": 1.6 },
+        "fill": { "position": [4, 1, 3], "color": "#2A4060", "intensity": 0.6 },
+        "rim": { "position": [0, 0, -6], "color": "#FFFFFF", "intensity": 1.0 },
+        "ambient": { "color": "#0A0A18", "intensity": 0.15 }
+      },
+      "geometry": {
+        "primary": "Stylized 3D globe sphere (radius 2.2) wireframed; only South Asia region rendered in solid #FFD200 with subtle terrain extrusion; rest as 2-tone wireframe",
+        "secondary": "Subtle scanlines via Effect on top half (~5% intensity)"
+      },
+      "materials": {
+        "globe": { "kind": "MeshStandardMaterial", "wireframe": true, "color": "#234060", "metalness": 0.35 },
+        "highlight": { "kind": "MeshPhysicalMaterial", "color": "#FFD200", "emissive": "#FF8800", "emissiveIntensity": 0.4, "roughness": 0.6 }
+      },
+      "color_palette": { "primary": "#FFD200", "wireframe": "#234060", "warm": "#FFA040" },
+      "post": { "dof": { "focusDistance": 0.04, "focalLength": 0.035, "bokehScale": 3.5 }, "bloom": { "intensity": 0.4, "luminanceThreshold": 0.8 }, "vignette": { "offset": 0.4 }, "noise": { "opacity": 0.05 } },
+      "mood": "scope reveal; the camera tells you we are zooming into a region, not a country",
+      "reference": "TLDR News opening cards — globe-with-highlight wireframe push-in"
+    },
+    {
+      "beatId": "setup",
+      "duration_seconds": 6.0,
+      "voiceover": "Pakistan opened six overland routes through Balochistan to keep Iran's economy moving — bypassing the blockaded Strait of Hormuz.",
+      "camera": { "type": "top-down-pan", "from": { "position": [0, 8, 0.001], "lookAt": [0, 0, 0] }, "to": { "position": [1.5, 7, 0.5], "lookAt": [0.3, 0, 0] }, "fov": 32 },
+      "lighting": { "key": { "position": [4, 6, 4], "color": "#FFE0A0", "intensity": 1.4 }, "fill": { "position": [-4, 2, -3], "color": "#3060A0", "intensity": 0.5 }, "rim": { "position": [0, 4, -6], "color": "#FFFFFF", "intensity": 0.9 }, "ambient": { "color": "#0A0814", "intensity": 0.18 } },
+      "geometry": {
+        "primary": "Top-down stylized terrain plane (10x10 units), Pakistan + Iran extruded as colored regions (Pakistan green, Iran red); 6 animated dashed-line tube arrows drawing from Karachi (eastern Pakistan) overland through Balochistan to Iranian crossings; arrows are AnimatedTubeGeometry with progressive draw using shader uv-clip",
+        "secondary": "Strait of Hormuz region with a red X drawn over it; small 3D-extruded label 'CLOSED' over the strait",
+        "particles": { "count": 30, "kind": "shipping-containers", "behavior": "instanced low-poly box meshes moving along the 6 arrow paths" }
+      },
+      "materials": { "pakistan": { "color": "#1A6B3F", "metalness": 0.2, "roughness": 0.7 }, "iran": { "color": "#7A2030", "metalness": 0.2, "roughness": 0.7 }, "arrows": { "color": "#FFD200", "emissive": "#FFD200", "emissiveIntensity": 0.5 }, "containers": { "color": "#C03000", "metalness": 0.5 } },
+      "color_palette": { "pakistan_green": "#1A6B3F", "iran_red": "#7A2030", "route_gold": "#FFD200", "container_orange": "#C03000" },
+      "post": { "dof": { "focusDistance": 0.05, "focalLength": 0.04, "bokehScale": 3.0 }, "bloom": { "intensity": 0.5, "luminanceThreshold": 0.82 }, "vignette": { "offset": 0.4 }, "noise": { "opacity": 0.06 } },
+      "mood": "tactical / map-room briefing; you're watching trade routes light up",
+      "reference": "Johnny Harris — animated map sequences with dashed-line arrows drawing across geography"
+    },
+    {
+      "beatId": "escalation",
+      "duration_seconds": 6.0,
+      "voiceover": "Pakistan's military is securing the Gwadar-to-Gabd corridor. China and Pakistan chose to side with Iran.",
+      "camera": { "type": "low-angle-orbit", "from": { "position": [-3, 0.6, 5] }, "to": { "position": [3, 0.6, 5] }, "fov": 30 },
+      "lighting": { "key": { "position": [0, 4, 2], "color": "#FF6040", "intensity": 1.8 }, "fill": { "position": [-5, 1, 4], "color": "#202848", "intensity": 0.6 }, "rim": { "position": [0, 1, -5], "color": "#FFFFFF", "intensity": 1.4 }, "ambient": { "color": "#0A0814", "intensity": 0.15 } },
+      "geometry": {
+        "primary": "Three 3D extruded country wordmarks in formation: 'PAKISTAN', 'CHINA', 'IRAN' arranged with PAKISTAN center-front, CHINA + IRAN flanking and slightly behind; thin red light beam connects all three at chest height",
+        "secondary": "Smoke / atmospheric haze via drei <Cloud> with low opacity sweeping past camera"
+      },
+      "materials": { "wordmarks": { "kind": "MeshPhysicalMaterial", "metalness": 0.7, "roughness": 0.3, "color": "#E8E8E0", "emissive": "#FF4020", "emissiveIntensity": 0.15 }, "beam": { "kind": "MeshBasicMaterial", "color": "#FF3040", "transparent": true, "opacity": 0.55 } },
+      "color_palette": { "type": "#E8E8E0", "alliance_red": "#FF3040", "atmosphere": "#202848" },
+      "post": { "dof": { "focusDistance": 0.045, "focalLength": 0.05, "bokehScale": 4.5 }, "bloom": { "intensity": 0.7, "luminanceThreshold": 0.75 }, "vignette": { "offset": 0.3 }, "chromaAb": { "offset": [0.0012, 0.0012] }, "noise": { "opacity": 0.06 } },
+      "mood": "alliance forming; ominous; the chess pieces just moved",
+      "reference": "Nat Geo Explorer — 3D country wordmarks lit from above with red threat-lighting"
+    },
+    {
+      "beatId": "climax",
+      "duration_seconds": 7.0,
+      "voiceover": "Three superpowers just chose sides on a war India can't ignore. The US is alone with Israel. India is the only major economy buying from both sides.",
+      "camera": { "type": "wide-static", "from": { "position": [0, 1.2, 8] }, "to": { "position": [0, 1.2, 7.5] }, "fov": 30 },
+      "lighting": { "key": { "position": [3, 5, 4], "color": "#FFD200", "intensity": 1.6 }, "fill": { "position": [-3, 5, 4], "color": "#1E90FF", "intensity": 1.0 }, "rim": { "position": [0, 0, -5], "color": "#FFFFFF", "intensity": 1.0 }, "ambient": { "color": "#0A0A1A", "intensity": 0.16 } },
+      "geometry": {
+        "primary": "Three floating 3D tile-cards staggered horizontally at z-depth 0/-0.5/-1: left card 'CHINA + PAK + IRAN' (red), center card 'INDIA — BOTH' (green, larger, with subtle pulse), right card 'US + ISRAEL' (blue); cards have rounded extruded geometry with bevel; each card has a subtle Indian/American/etc. flag accent strip at the bottom edge",
+        "secondary": "Faint connecting wireframe lines between the three cards, animated draw-in"
+      },
+      "materials": { "card_red": { "color": "#7A1030", "emissive": "#DC143C", "emissiveIntensity": 0.25, "roughness": 0.4 }, "card_green": { "color": "#1A6B3F", "emissive": "#22DD66", "emissiveIntensity": 0.35, "roughness": 0.35 }, "card_blue": { "color": "#1F3C70", "emissive": "#3060FF", "emissiveIntensity": 0.25, "roughness": 0.4 } },
+      "color_palette": { "axis_red": "#DC143C", "india_green": "#22DD66", "us_blue": "#3060FF" },
+      "post": { "dof": { "focusDistance": 0.05, "focalLength": 0.04, "bokehScale": 3.5 }, "bloom": { "intensity": 0.55, "luminanceThreshold": 0.78 }, "vignette": { "offset": 0.35 }, "noise": { "opacity": 0.05 } },
+      "mood": "reveal of the alignment; you understand the geopolitical chessboard in one shot",
+      "reference": "Vox shorts — three floating data cards with depth-of-field racking between them"
+    },
+    {
+      "beatId": "resolution",
+      "duration_seconds": 5.0,
+      "voiceover": "New Delhi just became the most important phone call in geopolitics. Modi can pressure Tehran. Modi can pressure Washington.",
+      "camera": { "type": "dolly-in-on-phone", "from": { "position": [0, 0.3, 6] }, "to": { "position": [0, 0.3, 3.5] }, "fov": 28 },
+      "lighting": { "key": { "position": [2, 3, 3], "color": "#FFFFFF", "intensity": 1.6 }, "fill": { "position": [-3, 2, 2], "color": "#FFA040", "intensity": 0.5 }, "rim": { "position": [0, 0, -3], "color": "#FFA040", "intensity": 1.0 }, "ambient": { "color": "#0A0A14", "intensity": 0.18 } },
+      "geometry": {
+        "primary": "Single 3D smartphone (slab geometry) floating; screen displays 'NEW DELHI →' with rotating destinations 'TEHRAN' / 'WASHINGTON' / 'BEIJING' (text Sequence inside the screen plane)",
+        "secondary": "Glowing dust around the phone; subtle phone vibration animation (slight y-shake)"
+      },
+      "materials": { "phone": { "kind": "MeshPhysicalMaterial", "metalness": 0.95, "roughness": 0.15, "color": "#1A1A22" }, "screen": { "kind": "MeshBasicMaterial", "color": "#FFFFFF", "emissive": "#FFFFFF", "emissiveIntensity": 1.0 } },
+      "color_palette": { "phone_body": "#1A1A22", "screen_glow": "#FFFFFF", "warm_accent": "#FFA040" },
+      "post": { "dof": { "focusDistance": 0.04, "focalLength": 0.045, "bokehScale": 4.5 }, "bloom": { "intensity": 0.6, "luminanceThreshold": 0.72 }, "vignette": { "offset": 0.4 }, "noise": { "opacity": 0.05 } },
+      "mood": "intimate; the camera pushes in like we're listening to one call that changes everything",
+      "reference": "Johnny Harris — phone-call cinematics where the device is the subject and the screen tells the story"
+    },
+    {
+      "beatId": "loop_cliffhanger",
+      "duration_seconds": 2.5,
+      "voiceover": "Pakistan picked Iran. India picked everyone. So what does Washington do now?",
+      "camera": { "type": "pull-back-reveal", "from": { "position": [0, 0, 4] }, "to": { "position": [0, 0, 9] }, "fov": 30 },
+      "lighting": { "key": { "position": [3, 4, 5], "color": "#FFD200", "intensity": 2.0 }, "fill": { "position": [-4, 2, 3], "color": "#1E90FF", "intensity": 0.5 }, "rim": { "position": [0, 0, -5], "color": "#FFFFFF", "intensity": 1.5 }, "ambient": { "color": "#07070F", "intensity": 0.18 } },
+      "geometry": {
+        "primary": "Text3D 'WASHINGTON?' with same Anton font + treatment as hook beat (closing the loop visually)",
+        "secondary": "Dust motes denser than hook (300 count); subtle radial flare at frame 0"
+      },
+      "materials": { "type": { "kind": "MeshPhysicalMaterial", "metalness": 0.85, "roughness": 0.22, "color": "#F4F4F0", "emissive": "#FFD200", "emissiveIntensity": 0.22 } },
+      "color_palette": { "primary": "#F4F4F0", "warm_money": "#FFD200", "bg_low": "#04060C" },
+      "post": { "dof": { "focusDistance": 0.055, "focalLength": 0.04, "bokehScale": 4.0 }, "bloom": { "intensity": 0.55, "luminanceThreshold": 0.78 }, "vignette": { "offset": 0.35 }, "chromaAb": { "offset": [0.0009, 0.0009] }, "noise": { "opacity": 0.05 } },
+      "mood": "open-ended; the question hangs in the air; visually rhymes with the opening hook for loop replay",
+      "reference": "Cleo Abram closer frames — type recapitulates opening, dust dense, question lingers"
+    }
+  ]
+}

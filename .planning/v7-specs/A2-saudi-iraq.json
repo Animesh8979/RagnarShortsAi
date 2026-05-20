@@ -1,0 +1,106 @@
+{
+  "scriptId": "A2-saudi-iraq",
+  "title": "Saudi Arabia Just Bombed Iraq",
+  "tts_rate": "+85%",
+  "approx_duration_sec": 33,
+  "beats": [
+    {
+      "beatId": "hook",
+      "duration_seconds": 2.5,
+      "voiceover": "Saudi Arabia just bombed Iraq. And nobody talked about it.",
+      "camera": { "type": "snap-zoom+settle", "from": { "position": [0, 0.3, 9] }, "to": { "position": [0, 0, 5.5] }, "fov": 30 },
+      "lighting": {
+        "key": { "position": [4, 4, 4], "color": "#FF3030", "intensity": 2.6 },
+        "fill": { "position": [-4, 1, 2], "color": "#1A2840", "intensity": 0.4 },
+        "rim": { "position": [0, 0, -5], "color": "#FFFFFF", "intensity": 1.4 },
+        "ambient": { "color": "#0A0810", "intensity": 0.15 }
+      },
+      "geometry": {
+        "primary": "Text 'SAUDI' (SDF Text component) at high scale, white with subtle red emissive halo; positioned slightly off-center (rule of thirds)",
+        "secondary": "Subtitle 'JUST BOMBED IRAQ' fades in below at frame 36; small red dust motes drifting upward as if from below-frame source"
+      },
+      "materials": { "type_glow": "red emissive #FF3030 at intensity 0.4; metallic catch from rim" },
+      "color_palette": { "alarm_red": "#FF3030", "deep_navy": "#1A2840", "type_white": "#F4F4F0" },
+      "post": { "dof": { "focusDistance": 0.05, "focalLength": 0.04, "bokehScale": 4.5 }, "bloom": { "intensity": 0.65, "luminanceThreshold": 0.7 }, "vignette": { "offset": 0.3 }, "chromaAb": { "offset": [0.0012, 0.0012] }, "noise": { "opacity": 0.06 } },
+      "mood": "alarm / breaking; the screen looks like the moment a chyron drops on a hot story",
+      "reference": "Vox / Cleo Abram alarm-frame: red light wash + tight crop + chromatic aberration"
+    },
+    {
+      "beatId": "establishing",
+      "duration_seconds": 3.0,
+      "voiceover": "The Middle East just split in half.",
+      "camera": { "type": "wide-static-then-push", "from": { "position": [0, 1, 8] }, "to": { "position": [0, 1, 6.5] }, "fov": 34 },
+      "lighting": { "key": { "position": [3, 5, 3], "color": "#FFE0A0", "intensity": 1.5 }, "fill": { "position": [-3, 2, 3], "color": "#2A4060", "intensity": 0.6 }, "ambient": { "color": "#0A0810", "intensity": 0.16 } },
+      "geometry": { "primary": "Stylized 3D plane of the Middle East with a CRACK animated splitting the region down the middle; left half tinted #22AA66 (Sunni green), right half tinted #DC143C (Shia red); crack uses ShaderMaterial with displacement noise" },
+      "color_palette": { "sunni_green": "#22AA66", "shia_red": "#DC143C", "neutral_warm": "#FFE0A0" },
+      "post": { "dof": { "focusDistance": 0.045, "focalLength": 0.04, "bokehScale": 3.5 }, "bloom": { "intensity": 0.45, "luminanceThreshold": 0.8 }, "vignette": { "offset": 0.4 }, "noise": { "opacity": 0.05 } },
+      "mood": "the rupture moment; you see the geopolitical fault line in one frame",
+      "reference": "TLDR News crack-the-map opener"
+    },
+    {
+      "beatId": "setup",
+      "duration_seconds": 6.0,
+      "voiceover": "Saudi fighter jets struck Iran-backed militia positions inside Iraq in May. Kuwait launched rocket strikes too. The Gulf is at war.",
+      "camera": { "type": "tracking-shot", "from": { "position": [-4, 0.8, 4] }, "to": { "position": [4, 0.8, 4] }, "fov": 30 },
+      "lighting": { "key": { "position": [0, 6, 2], "color": "#FFFFFF", "intensity": 1.4 }, "fill": { "position": [-3, 1, 3], "color": "#4060A0", "intensity": 0.6 }, "rim": { "position": [0, 0, -5], "color": "#FF8040", "intensity": 1.0 }, "ambient": { "color": "#08080F", "intensity": 0.16 } },
+      "geometry": { "primary": "Stylized F-15 silhouette (low-poly) flying right-to-left across mid-frame; particle trail of bright orange embers behind it; subtle motion blur via post chain; ground below shows dim desert plane with a few smoke columns rising from impact sites" },
+      "materials": { "jet": { "color": "#1A1A22", "metalness": 0.85, "roughness": 0.25 }, "embers": { "kind": "Points", "color": "#FF6020", "size": 0.04 } },
+      "color_palette": { "jet_dark": "#1A1A22", "ember_orange": "#FF6020", "desert_dim": "#3A2A1A" },
+      "post": { "dof": { "focusDistance": 0.04, "focalLength": 0.05, "bokehScale": 4.0 }, "bloom": { "intensity": 0.6, "luminanceThreshold": 0.7 }, "vignette": { "offset": 0.3 }, "chromaAb": { "offset": [0.001, 0.001] }, "noise": { "opacity": 0.07 } },
+      "mood": "the strike; you hear the script say 'fighter jets' and the camera shows you exactly that",
+      "reference": "Nat Geo Explorer reenactment shots — silhouetted aircraft, motivated lighting, dust-and-embers atmosphere"
+    },
+    {
+      "beatId": "escalation",
+      "duration_seconds": 6.0,
+      "voiceover": "Riyadh moved without Washington's lead. Mohammed bin Salman ordered it solo. Sunni Arabia and Shia Iran are now fighting through proxies on Iraqi soil.",
+      "camera": { "type": "slow-orbit", "from": { "position": [3, 1.5, 5] }, "to": { "position": [-3, 1.5, 5] }, "fov": 32 },
+      "lighting": { "key": { "position": [4, 3, 0], "color": "#FFFFFF", "intensity": 1.6 }, "fill": { "position": [-2, 2, 3], "color": "#202840", "intensity": 0.6 }, "rim": { "position": [0, 0, -5], "color": "#FF3030", "intensity": 1.6 }, "ambient": { "color": "#0A0814", "intensity": 0.15 } },
+      "geometry": { "primary": "Two facing 3D portraits-on-pillars: left pillar 'MBS' (silhouette) lit warm white; right pillar 'TEHRAN' lit cool blue; between them a thin red beam-of-conflict crossing through Iraqi territory (low ground plane labeled IRAQ in dim type)" },
+      "color_palette": { "saudi_warm": "#FFFFFF", "iran_cool": "#1E90FF", "conflict_red": "#FF3030" },
+      "post": { "dof": { "focusDistance": 0.045, "focalLength": 0.05, "bokehScale": 4.5 }, "bloom": { "intensity": 0.6, "luminanceThreshold": 0.75 }, "vignette": { "offset": 0.32 }, "noise": { "opacity": 0.06 } },
+      "mood": "proxy-war visualization; two powers in standoff, conflict in the middle",
+      "reference": "Johnny Harris confrontation shots — two opposing actors lit with contrasting color temps"
+    },
+    {
+      "beatId": "climax",
+      "duration_seconds": 7.0,
+      "voiceover": "Oil at $140 isn't the ceiling. Saudi production is down. Iraqi oil fields are now contested. India imports 40% of crude from these two countries combined.",
+      "camera": { "type": "vertical-tilt", "from": { "position": [0, 3, 6], "lookAt": [0, 0, 0] }, "to": { "position": [0, 0.5, 6], "lookAt": [0, 0.5, 0] }, "fov": 30 },
+      "geometry": {
+        "primary": "Stack of three 3D stat cards (vertical column): top card $140 (big number, oil-price red glow); middle card 'SAUDI ↓' with downward animated chevron arrows; bottom card '40%' in bold green-pulsing emphasis with 'INDIA IMPORTS' subtitle",
+        "secondary": "Faint background of oil-derrick silhouettes at low opacity"
+      },
+      "materials": { "card_140": { "color": "#7A1030", "emissive": "#DC143C", "emissiveIntensity": 0.35 }, "card_arrow": { "color": "#7A4030", "emissive": "#FF6020", "emissiveIntensity": 0.25 }, "card_40pct": { "color": "#1A6B3F", "emissive": "#22DD66", "emissiveIntensity": 0.45 } },
+      "color_palette": { "oil_red": "#DC143C", "down_arrow_orange": "#FF6020", "india_green": "#22DD66" },
+      "lighting": { "key": { "position": [3, 4, 3], "color": "#FFFFFF", "intensity": 1.4 }, "fill": { "position": [-3, 2, 3], "color": "#2A4060", "intensity": 0.6 }, "ambient": { "color": "#0A0814", "intensity": 0.16 } },
+      "post": { "dof": { "focusDistance": 0.04, "focalLength": 0.04, "bokehScale": 3.5 }, "bloom": { "intensity": 0.5, "luminanceThreshold": 0.78 }, "vignette": { "offset": 0.36 }, "noise": { "opacity": 0.05 } },
+      "mood": "data-card revelation; the camera tilts down the three claims in sequence",
+      "reference": "Vox shorts data-card column with vertical tilt"
+    },
+    {
+      "beatId": "resolution",
+      "duration_seconds": 5.0,
+      "voiceover": "The Gulf War your parents watched plays out again — but this time the players are smaller, the proxies are everywhere, and the US is sitting it out.",
+      "camera": { "type": "crossfade-archival", "from": { "position": [0, 0.5, 7] }, "to": { "position": [0, 0.5, 5] }, "fov": 32 },
+      "geometry": { "primary": "Left half of frame: dim sepia-tinted archival news plate '1991 GULF WAR' as 3D-mounted photograph; right half: vibrant '2026' card with same scene composition but redder palette; both meet at a vertical seam that glows" },
+      "color_palette": { "sepia_archival": "#8A6840", "modern_red": "#DC143C", "seam_glow": "#FFD200" },
+      "lighting": { "key": { "position": [2, 4, 4], "color": "#FFE0A0", "intensity": 1.5 }, "fill": { "position": [-2, 2, 3], "color": "#3060A0", "intensity": 0.5 }, "ambient": { "color": "#0A0814", "intensity": 0.16 } },
+      "post": { "dof": { "focusDistance": 0.045, "focalLength": 0.04, "bokehScale": 4.0 }, "bloom": { "intensity": 0.55, "luminanceThreshold": 0.78 }, "vignette": { "offset": 0.36 }, "noise": { "opacity": 0.07 } },
+      "mood": "historical rhyme; we've been here before, but the rules changed",
+      "reference": "Nat Geo Explorer split-frame archival-vs-modern comparison shots"
+    },
+    {
+      "beatId": "loop_cliffhanger",
+      "duration_seconds": 2.5,
+      "voiceover": "Saudi bombed Iraq. India quietly hedged. So what's Washington's move?",
+      "camera": { "type": "pull-back-reveal", "from": { "position": [0, 0, 4] }, "to": { "position": [0, 0, 9] }, "fov": 30 },
+      "geometry": { "primary": "Text 'WASHINGTON?' large white SDF text with red rim-light catch; dust motes denser than hook (matching the loop beat of A1)" },
+      "lighting": { "key": { "position": [3, 4, 5], "color": "#FF3030", "intensity": 2.2 }, "fill": { "position": [-4, 2, 3], "color": "#1A2840", "intensity": 0.5 }, "rim": { "position": [0, 0, -5], "color": "#FFFFFF", "intensity": 1.5 }, "ambient": { "color": "#07070F", "intensity": 0.18 } },
+      "color_palette": { "alarm_red": "#FF3030", "type_white": "#F4F4F0" },
+      "post": { "dof": { "focusDistance": 0.055, "focalLength": 0.04, "bokehScale": 4.0 }, "bloom": { "intensity": 0.6, "luminanceThreshold": 0.72 }, "vignette": { "offset": 0.32 }, "chromaAb": { "offset": [0.0012, 0.0012] }, "noise": { "opacity": 0.06 } },
+      "mood": "the question hangs; matches A1 loop visually so daily-batch viewers feel the cohesion",
+      "reference": "Cleo Abram closer matching the opener — visual rhyme"
+    }
+  ]
+}
