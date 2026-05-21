@@ -1,0 +1,27 @@
+{
+  "scriptId": "A2-saudi-iraq",
+  "sourceFile": ".planning/growth-strategy/daily/2026-05-18/script-A2-saudi-bombed-iraq.v4-optimized.json",
+  "trimmedAt": "2026-05-21T15:00:00Z",
+  "module": "MASTER-REBUILD Phase 3 — script-trim-for-natural-speech",
+  "targetWords": 85,
+  "ttsRateTarget": "+5%",
+  "rationale": "V4-optimized was 139 words requiring +85% TTS rate (frantic). Trimmed to 85 words for natural-speech +5% rate at 28-32s duration.",
+  "optimized": {
+    "title": "Saudi Arabia Just Bombed Iraq",
+    "hook": "Saudi bombs Iraq",
+    "loopReference": "Saudi",
+    "powerWords": ["Saudi", "Iraq", "Iran", "Kuwait", "MBS", "Sunni", "Shia", "India", "Washington"],
+    "fullVoiceover": "Saudi just bombed Iraq. Nobody is talking about it. Saudi fighter jets struck Iran-backed militia positions inside Iraq in May. Kuwait fired rockets too. The Gulf is at war and the US isn't leading it. Riyadh moved without Washington's lead. MBS ordered it solo. Sunni Saudi and Shia Iran are now fighting through proxies on Iraqi soil. Oil at one-forty isn't the ceiling. India imports forty percent from both countries. Saudi bombed Iraq. India hedged. So what's Washington's next move?",
+    "beats": [
+      { "tStart": 0,   "tEnd": 2.5, "vo": "Saudi just bombed Iraq. Nobody is talking about it.", "visualPrompt": "Cinematic editorial photograph of a Saudi F-15 fighter jet silhouette against dusk sky, atmospheric haze, dramatic side lighting" },
+      { "tStart": 2.5, "tEnd": 8,   "vo": "Saudi fighter jets struck Iran-backed militia inside Iraq in May. Kuwait fired rockets too.", "visualPrompt": "Aerial photograph of Iraqi desert at twilight, smoke columns rising from impact sites, dramatic sky, editorial photojournalism" },
+      { "tStart": 8,   "tEnd": 14,  "vo": "The Gulf is at war and the US isn't leading it. MBS ordered it solo.", "visualPrompt": "Cinematic photograph of Saudi royal palace at dusk, single warm light visible, atmospheric haze, dramatic shadow play" },
+      { "tStart": 14,  "tEnd": 21,  "vo": "Sunni Saudi and Shia Iran are fighting through proxies on Iraqi soil.", "visualPrompt": "Cinematic editorial photograph of a Middle Eastern map laid on a table with red and green pins, single warm desk light, shallow depth of field" },
+      { "tStart": 21,  "tEnd": 26,  "vo": "Oil at one-forty isn't the ceiling. India imports forty percent from both countries.", "visualPrompt": "Aerial photograph of an oil refinery at twilight, towers backlit by setting sun, atmospheric haze, editorial photojournalism" },
+      { "tStart": 26,  "tEnd": 30,  "vo": "Saudi bombed Iraq. India hedged. What's Washington's move?", "visualPrompt": "Cinematic photograph of the US Capitol building at twilight, atmospheric haze, dramatic clouds, photojournalism" }
+    ],
+    "changesFromOriginal": "Trimmed from 139 words to 84 words. Removed 'Middle East split in half' redundancy, condensed MBS-solo framing, dropped 'Gulf War your parents watched' nostalgia line (visual carries it), tightened oil/India stat. Hook + loop preserved.",
+    "wordCount": 84,
+    "estimatedDurationSec": 30
+  }
+}
