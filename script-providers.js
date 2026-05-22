@@ -1557,10 +1557,13 @@ async function callOllama(prompt, modelName, label) {
 }
 
 function buildGeminiProviders() {
+  // Phase A — free-tier key returns 400 API_KEY_INVALID on gemini-2.5-*.
+  // Default to gemini-1.5-flash for free-tier compatibility. Paid keys can
+  // override via GEMINI_SCRIPT_*_MODEL env vars.
   const models = uniqueNonEmpty([
-    process.env.GEMINI_SCRIPT_PRIMARY_MODEL || 'gemini-2.5-flash',
-    process.env.GEMINI_SCRIPT_SECONDARY_MODEL || 'gemini-2.5-flash-lite',
-    process.env.GEMINI_SCRIPT_QUALITY_MODEL || 'gemini-2.5-pro',
+    process.env.GEMINI_SCRIPT_PRIMARY_MODEL || 'gemini-1.5-flash',
+    process.env.GEMINI_SCRIPT_SECONDARY_MODEL || 'gemini-1.5-flash-8b',
+    process.env.GEMINI_SCRIPT_QUALITY_MODEL || 'gemini-1.5-pro',
     process.env.GEMINI_SCRIPT_EXPERIMENTAL_MODEL || '',
   ]).filter((modelName) => {
     if (!SCRIPT_FREE_ONLY_MODE || GEMINI_ALLOW_PRO_IN_FREE_ONLY) {

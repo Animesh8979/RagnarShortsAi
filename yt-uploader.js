@@ -90,6 +90,18 @@ async function uploadToYouTube(videoPath, title, description, tags = [], options
     throw new Error(`Video file not found: ${videoPath}`);
   }
 
+  // Phase B — metadata uniqueness gate. Block before any API call if the
+  // title/description/tags collide with anything shipped in the last N days.
+  // Override per-call by passing options.skipMetadataUniqueGate = true.
+  if (options.skipMetadataUniqueGate !== true) {
+    const { assertMetadataUnique } = require('./lib/metadata-uniqueness');
+    const verdict = assertMetadataUnique({ title, description, tags });
+    if (!verdict.ok) {
+      const hit = verdict.hit || {};
+      throw new Error(`metadata_too_similar (Phase B): ${verdict.reason} score=${verdict.score} vs recent upload "${hit.title}" (${hit.videoId || hit.ts}). Regenerate metadata via route('script_llm') and retry.`);
+    }
+  }
+
   const fileSizeMb = (fs.statSync(videoPath).size / (1024 * 1024)).toFixed(2);
   console.log(`\n📺 YouTube Upload Starting...`);
   console.log(`   File: ${path.basename(videoPath)} (${fileSizeMb} MB)`);
@@ -132,6 +144,11 @@ async function uploadToYouTube(videoPath, title, description, tags = [], options
     privacyStatus: options.privacyStatus || 'public',
     selfDeclaredMadeForKids: false,
     embeddable: true,
+    // Hide like / view / dislike counters from the public watch page.
+    // Default ON because the suppression-recovery analysis suggests counts
+    // (esp. 0 views) accelerate algorithmic downranking. Override per-upload
+    // by passing `options.publicStatsViewable = true`.
+    publicStatsViewable: options.publicStatsViewable === true ? true : false,
   };
 
   try {
@@ -150,6 +167,17 @@ async function uploadToYouTube(videoPath, title, description, tags = [], options
     console.log(`   ✅ Upload successful!`);
     console.log(`   🔗 URL: ${videoUrl}`);
     console.log(`   📌 Video ID: ${videoId}`);
+
+    // Phase B — record into uploaded-metadata-ledger for future uniqueness gates.
+    try {
+      const { recordUploadedMetadata } = require('./lib/metadata-uniqueness');
+      recordUploadedMetadata({
+        videoId,
+        channel: options.channelLabel || null,
+        platform: 'youtube_shorts',
+        title, description, tags,
+      });
+    } catch (e) { /* non-fatal */ }
 
     if (options.pinnedComment) {
       try {

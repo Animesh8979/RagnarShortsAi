@@ -3517,7 +3517,12 @@ async function requestGeminiScript(prompt) {
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({model: 'gemini-2.5-flash'});
+  // Phase A — free-tier key returns 400 API_KEY_INVALID on gemini-2.5-flash.
+  // 1.5-flash is the free-tier-compatible default; overrideable via env.
+  const modelName = process.env.GEMINI_SCRIPT_PRIMARY_MODEL
+    || process.env.GEMINI_STORY_PRIMARY_MODEL
+    || 'gemini-1.5-flash';
+  const model = genAI.getGenerativeModel({ model: modelName });
   const result = await model.generateContent(prompt);
   return result.response.text();
 }
@@ -3580,9 +3585,19 @@ async function generateScriptPayload(recoveryLog, topic, topicContext = null) {
 
   // Ultimate fallback: hardcoded payload
   console.log('   ðŸ—ï¸  Using hardcoded fallback payload');
+  // Phase A — HARD-BLOCK the static fallback placeholder when HALT_ON_PROVIDER_EXHAUSTION=1.
+  // The legacy createFallbackPayload() emits near-identical metadata for every video
+  // that hits it. Re-uploading near-identical titles/descriptions/tags triggered
+  // YouTube's Repetitive Content policy and locked the channel to 0 views. A
+  // 0-view duplicate is worse than no upload. Halting forces upstream to retry.
+  if (String(process.env.HALT_ON_PROVIDER_EXHAUSTION || '1') === '1') {
+    recoveryLog.push('Script HALT (Phase A): all providers exhausted; static fallback placeholder disabled to prevent suppression. Set HALT_ON_PROVIDER_EXHAUSTION=0 to allow legacy fallback (not recommended).');
+    throw new Error('script_providers_exhausted_halted (Phase A) — refusing to emit static fallback. Retry when a provider is reachable.');
+  }
+
   const fallbackPayload = normalizePayload(deepClone(createFallbackPayload(topic)), topic);
   if (fallbackPayload) {
-    recoveryLog.push('Script fallback: all providers failed, hardcoded payload injected.');
+    recoveryLog.push('Script fallback: all providers failed, hardcoded payload injected (legacy path, suppression risk).');
     return fallbackPayload;
   }
 

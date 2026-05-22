@@ -94,7 +94,8 @@ async function callGeminiHook(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
-  const model = process.env.GEMINI_SCRIPT_PRIMARY_MODEL || 'gemini-2.5-flash';
+  // Phase A — free-tier key requires 1.5; 2.5-* returns 400.
+  const model = process.env.GEMINI_SCRIPT_PRIMARY_MODEL || 'gemini-1.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {

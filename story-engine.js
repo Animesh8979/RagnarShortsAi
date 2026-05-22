@@ -553,10 +553,11 @@ function saveState(state) {
 async function callGeminiStory(prompt) {
   const { GoogleGenerativeAI } = require('@google/generative-ai');
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  // Phase A — free-tier key returns 400 on gemini-2.5-*. Default to 1.5 family.
   const models = uniqueNonEmpty([
-    process.env.GEMINI_STORY_QUALITY_MODEL || 'gemini-2.5-pro',
-    process.env.GEMINI_STORY_PRIMARY_MODEL || 'gemini-2.5-flash',
-    process.env.GEMINI_STORY_SECONDARY_MODEL || 'gemini-2.5-flash-lite',
+    process.env.GEMINI_STORY_QUALITY_MODEL || 'gemini-1.5-pro',
+    process.env.GEMINI_STORY_PRIMARY_MODEL || 'gemini-1.5-flash',
+    process.env.GEMINI_STORY_SECONDARY_MODEL || 'gemini-1.5-flash-8b',
     process.env.GEMINI_STORY_EXPERIMENTAL_MODEL || '',
   ]);
   let lastError = null;

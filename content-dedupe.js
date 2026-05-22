@@ -3,7 +3,10 @@ const path = require('path');
 
 const ROOT_DIR = __dirname;
 const ANALYTICS_DIR = path.join(ROOT_DIR, 'renders', 'analytics');
-const DEFAULT_LOOKBACK_DAYS = 14;
+// Phase B — widen dedupe window to 14 days (env-overrideable).
+const DEFAULT_LOOKBACK_DAYS = Math.max(1, Number(process.env.CONTENT_DEDUPE_DAYS) || 14);
+// Phase B — Jaccard min cluster match (default 0.6 per recovery prompt).
+const DEFAULT_JACCARD_MIN = Math.max(0, Math.min(1, Number(process.env.CONTENT_DEDUPE_JACCARD_MIN) || 0.6));
 const TOPIC_STOPWORDS = new Set([
   'about', 'after', 'again', 'ahead', 'amid', 'analysis', 'another', 'around', 'because',
   'before', 'being', 'between', 'breaking', 'change', 'changes', 'could', 'daily', 'drop',
@@ -135,8 +138,12 @@ function buildContentIdentity(item = {}) {
 }
 
 function isLikelyDuplicateTopic(topic, comparisonTopic, options = {}) {
-  const threshold = Number.isFinite(Number(options.threshold)) ? Number(options.threshold) : 0.68;
-  const strictThreshold = Number.isFinite(Number(options.strictThreshold)) ? Number(options.strictThreshold) : 0.82;
+  // Phase B — tighter cluster match. Default threshold = CONTENT_DEDUPE_JACCARD_MIN (0.6),
+  // strict = +0.2 above it. Caller can override per-call.
+  const threshold = Number.isFinite(Number(options.threshold)) ? Number(options.threshold) : DEFAULT_JACCARD_MIN;
+  const strictThreshold = Number.isFinite(Number(options.strictThreshold))
+    ? Number(options.strictThreshold)
+    : Math.min(0.95, DEFAULT_JACCARD_MIN + 0.2);
   const leftSignature = buildTokenSignature(topic);
   const rightSignature = buildTokenSignature(comparisonTopic);
   if (!leftSignature || !rightSignature) {

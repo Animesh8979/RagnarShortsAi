@@ -421,7 +421,10 @@ async function generateGeminiFlashImage(prompt, sceneIndex, options = {}) {
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image' });
+    // Phase A — gemini-2.5-flash-image is paid-tier only. Free-tier image gen
+    // is not generally available; default to a 1.5 variant if forced, but the
+    // primary image path is hero-visual.js → NVIDIA FLUX via provider-router.
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_IMAGE_MODEL || 'gemini-1.5-flash' });
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: `Generate an image: ${enhancedPrompt}` }] }],
@@ -572,8 +575,9 @@ async function generateAIImage(prompt, sceneIndex, recoveryLog = [], options = {
       if (geminiKey) {
         try {
           const genAI = new GoogleGenerativeAI(geminiKey);
-          // V104: env override — free-tier keys only accept flash-lite (vision capable).
-          const judgeModel = process.env.GEMINI_VISION_JUDGE_MODEL || process.env.VISUAL_AUDIT_MODEL || 'gemini-2.5-flash-lite';
+          // Phase A — free-tier keys return 400 on gemini-2.5-*. 1.5-flash is
+          // multimodal (text + image input) and works on free tier.
+          const judgeModel = process.env.GEMINI_VISION_JUDGE_MODEL || process.env.VISUAL_AUDIT_MODEL || 'gemini-1.5-flash';
           const model = genAI.getGenerativeModel({ model: judgeModel });
           const imagePath = path.join(__dirname, 'public', result.src);
           const imageData = fs.readFileSync(imagePath).toString('base64');

@@ -232,7 +232,40 @@ async function stageVideoForInstagram(videoPath, options = {}) {
     return { publicVideoUrl: manualUrl, publicFileName: safeName || originalName };
   }
 
-  // Auto-upload to free public hosting
+  // Phase C — prefer cloudflared tunnel + local-media-server over anonymous
+  // file hosts (catbox/litterbox/gofile). Meta downranks anonymous-host
+  // origins as bot-driven, which suppresses Reels Explore impressions to 0.
+  // When INSTAGRAM_PUBLIC_HOST_MODE=cloudflared (default in suppression-
+  // recovery branch), spin up the tunnel, mint a token-gated URL, and pass
+  // that to Meta. Falls back to anonymous hosts only when the tunnel fails
+  // AND options.allowAnonymousHostFallback === true (default false now).
+  const hostMode = (options.publicHostMode || process.env.INSTAGRAM_PUBLIC_HOST_MODE || 'cloudflared').toLowerCase();
+  if (hostMode === 'cloudflared') {
+    try {
+      const tunnelMgr = require('./lib/cloudflared-tunnel-singleton');
+      const { url, port } = await tunnelMgr.ensureRunning();
+      const { mintShareUrl } = require('./lib/local-media-server');
+      const minted = mintShareUrl(videoPath, { ttlMs: 6 * 60 * 60 * 1000 });
+      // mint runs on the singleton's port — `port` confirms parity.
+      if (port !== minted.port) {
+        console.log(`   ⚠  port mismatch (tunnel=${port}, mint=${minted.port}); using mint`);
+      }
+      return {
+        publicVideoUrl: url + minted.urlPath,
+        publicFileName: safeName || originalName,
+        hostProvider: 'cloudflared-quick-tunnel',
+      };
+    } catch (err) {
+      console.log(`   ⚠  cloudflared host path failed: ${err.message.slice(0, 200)}`);
+      if (options.allowAnonymousHostFallback !== true) {
+        throw new Error(`Instagram public host failed (mode=cloudflared, no fallback allowed): ${err.message}`);
+      }
+      // Fall through to anonymous-host fallback only if explicitly allowed.
+    }
+  }
+
+  // Auto-upload to free public hosting (anonymous; flagged by Meta).
+  console.log('   ⚠  Falling back to anonymous file host (catbox/litterbox/gofile) — Meta may downrank this.');
   try {
     const { uploadToPublicHost } = require('./public-video-host');
     const result = await uploadToPublicHost(videoPath, { allowSingleUseHosts: false });
@@ -312,6 +345,23 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
   if (!options.skipPermitCheck) {
     assertPublishPermit(options, { platform: 'instagram_reels', videoPath });
   }
+  // Phase B — IG-side metadata gate. Caption is the IG analogue of YT title+description.
+  // Block before any Graph API call if caption + tags collide with last N days.
+  if (options.skipMetadataUniqueGate !== true) {
+    try {
+      const { assertMetadataUnique } = require('./lib/metadata-uniqueness');
+      const hashtags = (String(caption || '').match(/#[a-z0-9_]+/gi) || []).map((h) => h.replace(/^#/, '').toLowerCase());
+      const verdict = assertMetadataUnique({ title: String(caption || '').slice(0, 100), description: caption, tags: hashtags });
+      if (!verdict.ok) {
+        const hit = verdict.hit || {};
+        throw new Error(`metadata_too_similar (Phase B IG): ${verdict.reason} score=${verdict.score} vs "${hit.title}" (${hit.videoId || hit.ts}). Regenerate caption.`);
+      }
+    } catch (e) {
+      if (/^metadata_too_similar/.test(String(e && e.message))) throw e;
+      // require() failure or analytics issue is non-fatal — log and continue.
+      console.log(`   ⚠  metadata-uniqueness gate skipped: ${e.message.slice(0, 120)}`);
+    }
+  }
   ensureConfigured();
   const instagramVideoPath = optimizeVideoForInstagram(videoPath, options);
   if (!canAttempt(INSTAGRAM_CIRCUIT_KEY)) {
@@ -368,6 +418,37 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
       console.log('   OK Instagram publish successful');
       if (permalink) console.log(`   URL: ${permalink}`);
       recordCircuitSuccess(INSTAGRAM_CIRCUIT_KEY);
+
+      // Phase B — record published metadata for future uniqueness gates.
+      try {
+        const { recordUploadedMetadata } = require('./lib/metadata-uniqueness');
+        const hashtags = (String(caption || '').match(/#[a-z0-9_]+/gi) || []).map((h) => h.replace(/^#/, '').toLowerCase());
+        recordUploadedMetadata({
+          videoId: mediaId,
+          channel: options.channelLabel || 'shared-instagram',
+          platform: 'instagram_reels',
+          title: String(caption || '').slice(0, 100),
+          description: caption,
+          tags: hashtags,
+        });
+      } catch (_) { /* non-fatal */ }
+
+      // Default ON: hide comment + like/view counts on the published reel.
+      // Override per-upload by passing `options.hideEngagementCounts = false`.
+      // The Graph API needs `instagram_manage_comments` for `comment_enabled=false`
+      // and currently fails with #10 if the token lacks the scope — logged, not fatal.
+      const hideCounts = options.hideEngagementCounts !== false;
+      if (hideCounts && mediaId) {
+        for (const [field, value] of [['comment_enabled', 'false'], ['like_and_view_counts_disabled', 'true']]) {
+          try {
+            await graphRequest('POST', mediaId, { [field]: value });
+            console.log(`   ${field}=${value} ✓`);
+          } catch (e) {
+            const msg = String(e && e.message || e).slice(0, 160);
+            console.log(`   ${field}=${value} skipped: ${msg}`);
+          }
+        }
+      }
 
       return {
         success: true,
