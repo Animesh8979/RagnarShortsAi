@@ -240,13 +240,16 @@ async function stageVideoForInstagram(videoPath, options = {}) {
   // that to Meta. Falls back to anonymous hosts only when the tunnel fails
   // AND options.allowAnonymousHostFallback === true (default false now).
   const hostMode = (options.publicHostMode || process.env.INSTAGRAM_PUBLIC_HOST_MODE || 'cloudflared').toLowerCase();
+  // Default: anonymous fallback is ALLOWED so a single tunnel hiccup never
+  // blocks the batch. To strictly forbid the anonymous path, set
+  // INSTAGRAM_STRICT_CLEAN_HOST=1 or pass options.allowAnonymousHostFallback=false.
+  const allowAnonFallback = options.allowAnonymousHostFallback !== false && process.env.INSTAGRAM_STRICT_CLEAN_HOST !== '1';
   if (hostMode === 'cloudflared') {
     try {
       const tunnelMgr = require('./lib/cloudflared-tunnel-singleton');
       const { url, port } = await tunnelMgr.ensureRunning();
       const { mintShareUrl } = require('./lib/local-media-server');
       const minted = mintShareUrl(videoPath, { ttlMs: 6 * 60 * 60 * 1000 });
-      // mint runs on the singleton's port — `port` confirms parity.
       if (port !== minted.port) {
         console.log(`   ⚠  port mismatch (tunnel=${port}, mint=${minted.port}); using mint`);
       }
@@ -257,10 +260,10 @@ async function stageVideoForInstagram(videoPath, options = {}) {
       };
     } catch (err) {
       console.log(`   ⚠  cloudflared host path failed: ${err.message.slice(0, 200)}`);
-      if (options.allowAnonymousHostFallback !== true) {
-        throw new Error(`Instagram public host failed (mode=cloudflared, no fallback allowed): ${err.message}`);
+      if (!allowAnonFallback) {
+        throw new Error(`Instagram public host failed (mode=cloudflared, no anonymous fallback allowed): ${err.message}`);
       }
-      // Fall through to anonymous-host fallback only if explicitly allowed.
+      // Fall through to anonymous-host fallback.
     }
   }
 
