@@ -85,6 +85,11 @@ node upload-v8-clip.js B3               # if more than 2 viable clips ranked
 
 `upload-v8-batch.js` can serialize all of the above with the 1h gap (or skip the gap by `--gap-min 10` once Phase B uniqueness gates are exercised).
 
+## TTS pace
+- Edge TTS rate is now **+15%** (was +25% in the just-shipped fresh batch). At GuyNeural this lands ~140 wpm — natural newscast cadence, not rushed. Captions auto-sync because they read from Edge's word-boundary events (slower rate → wider boundary spacing).
+- Script target word count was lowered from 78-82 → **72-76 words** so total video duration stays ~31s at the slower pace.
+- To slow further: set `ttsRate` to `+10%` (≈132 wpm) or `+5%` (≈125 wpm) in `lib/daily-fresh-batch.js`.
+
 ## Gates to pass before tomorrow's run
 1. ✅ `grep -rn 'gemini-2\.5' --include='*.js'` returns only comments (no live calls).
 2. ✅ `node -e "require('./lib/metadata-uniqueness')._testReset(); ..."` confirms duplicates block.
