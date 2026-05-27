@@ -38,6 +38,9 @@ function serializePlatformResult(result) {
     success: result.success === true,
     url: result.videoUrl || result.permalink || null,
     mediaId: result.videoId || result.mediaId || null,
+    // Phase 1.4 — preserve channel routing so channel-cluster-router can read
+    // per-(channel × cluster) AVD from this ledger without a separate lookup.
+    channelLabel: result.channelLabel || result.channel || null,
     error: compactString(result.error || result.message || null),
   };
 }
