@@ -1,0 +1,86 @@
+# Phase 6.1 — daily batch on the self-hosted runner.
+#
+# Runs every 6 hours on the user's D:\ box (registered via `cd D:\github-runner && ./config.cmd`).
+# Self-hosted runner minutes don't count against the free tier.
+#
+# The job: refresh analytics → optional prompt-evolution refresh → fresh-batch
+# render + auto-upload chain → cost-ledger CI gate.
+#
+# Required repo secrets to mirror the .env (set via gh secret set or repo Settings):
+#   GEMINI_API_KEY, GROQ_API_KEY, NVIDIA_API_KEY, HUGGINGFACE_API_KEY,
+#   GITHUB_MODELS_TOKEN, INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_USER_ID,
+#   TWITTER_API_KEY/SECRET + TWITTER_ACCESS_TOKEN/SECRET (already in .env).
+
+name: Daily Fresh Batch
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6h UTC — 4 batches/day
+  workflow_dispatch:
+    inputs:
+      organic_count:
+        description: '# organic videos to render'
+        required: false
+        default: '2'
+      clips_count:
+        description: '# creator clips to render'
+        required: false
+        default: '2'
+
+jobs:
+  daily-batch:
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 240   # 4h budget; usually finishes in ~30 min + 3h upload gaps
+    defaults:
+      run:
+        # Run in the project root, not the runner's _work dir
+        working-directory: D:\anitgravity work
+        shell: bash
+    steps:
+      - name: Show env (no secrets)
+        run: |
+          echo "Branch: $(git branch --show-current)"
+          echo "Commit: $(git log --oneline -1)"
+          node --version
+          ls -la lib/env-d-drive-only.js
+
+      - name: Refresh YouTube analytics
+        run: node refresh-youtube-analytics.js
+        continue-on-error: true   # don't fail the batch if analytics quota is hit
+
+      - name: Refresh IG metrics
+        run: node lib/ig-metrics.js --since 48h
+        continue-on-error: true
+
+      - name: Harvest top comments (Phase 2.1)
+        run: node lib/comment-harvester.js --window 48h
+        continue-on-error: true
+
+      - name: Evolve hook STYLE_NOTES from analytics (Phase 1.2)
+        run: node lib/prompt-evolution.js
+        continue-on-error: true
+
+      - name: Run fresh-batch render + auto-upload chain
+        run: |
+          node lib/daily-fresh-batch.js \
+            --organic ${{ github.event.inputs.organic_count || '2' }} \
+            --clips ${{ github.event.inputs.clips_count || '2' }} \
+            --community 1 \
+            --auto-upload \
+            --upload-gap-min 60
+        env:
+          DEBUG_DDRIVE: '1'
+
+      - name: Cost-ledger CI gate (Phase 6.4)
+        run: |
+          node lib/cost-ledger.js --verify
+
+      - name: Upload batch JSON as workflow artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fresh-batch-${{ github.run_id }}
+          path: |
+            D:\anitgravity work\renders\fresh-batch-*.json
+            D:\anitgravity work\renders\analytics\cost-ledger-*.jsonl
+          if-no-files-found: ignore
+          retention-days: 14

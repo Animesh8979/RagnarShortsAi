@@ -223,8 +223,68 @@ async function uploadToTwitter(videoPath, metadata = {}) {
   }
 }
 
+/**
+ * Phase 5.2 — text-thread upload.
+ *
+ * Posts a sequence of tweets, each as a reply to the previous one, so the
+ * UI renders them as a connected thread on x.com.
+ *
+ * @param {Array<{text:string}>} tweets   array of 2-10 tweet text objects
+ * @param {object} [opts]
+ * @param {object} [opts.replyTo]   if provided, the first tweet replies to this status id
+ * @param {string} [opts.linkBack]  optional URL to substitute for "{YT_SHORT_URL}" placeholder in any tweet
+ * @returns {{success:boolean, tweetIds?:string[], threadHeadId?:string, error?:string}}
+ */
+async function uploadThread(tweets, opts = {}) {
+  if (!isTwitterConfigured()) return { success: false, error: 'twitter_not_configured' };
+  if (!Array.isArray(tweets) || tweets.length < 1) return { success: false, error: 'empty_thread' };
+  if (!canAttempt(CIRCUIT_ID)) return { success: false, error: 'circuit_open' };
+
+  const ids = [];
+  let prevId = opts.replyTo || null;
+
+  for (let i = 0; i < tweets.length; i++) {
+    let text = String((tweets[i] && tweets[i].text) || '').slice(0, 270);
+    // Substitute placeholders ({YT_SHORT_URL}) with the actual link.
+    if (opts.linkBack) text = text.replace(/\{YT_SHORT_URL\}/g, opts.linkBack);
+    if (!text.trim()) continue;
+
+    const body = { text };
+    if (prevId) body.reply = { in_reply_to_tweet_id: prevId };
+
+    const tweetAuth = generateOAuthHeader('POST', TWITTER_POST_URL);
+    let resp;
+    try {
+      resp = await fetch(TWITTER_POST_URL, {
+        method: 'POST',
+        headers: { 'Authorization': tweetAuth, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (e) {
+      recordCircuitFailure(CIRCUIT_ID);
+      return { success: false, error: `thread_tweet_${i + 1}_threw: ${(e && e.message || e).slice(0, 160)}`, tweetIds: ids };
+    }
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => '');
+      recordCircuitFailure(CIRCUIT_ID);
+      return { success: false, error: `thread_tweet_${i + 1}_http_${resp.status}: ${t.slice(0, 160)}`, tweetIds: ids };
+    }
+    const j = await resp.json();
+    const id = j && j.data && j.data.id;
+    if (!id) return { success: false, error: `thread_tweet_${i + 1}_no_id`, tweetIds: ids };
+    ids.push(id);
+    prevId = id;
+    // X has a 50 reqs / 15 min window — short pause between thread tweets stays well under.
+    if (i < tweets.length - 1) await new Promise((r) => setTimeout(r, 800));
+  }
+  recordCircuitSuccess(CIRCUIT_ID);
+  return { success: true, tweetIds: ids, threadHeadId: ids[0], threadUrl: ids[0] ? `https://x.com/i/web/status/${ids[0]}` : null };
+}
+
 module.exports = {
   uploadToTwitter,
+  uploadThread,
   isTwitterConfigured,
   buildTwitterMetadata,
 };

@@ -153,7 +153,7 @@ async function graphRequest(method, resourcePath, params = {}) {
             process.env.INSTAGRAM_ACCESS_TOKEN = rotateData.access_token;
             
             // Rewrite .env safely
-            const envPath = path.join(process.cwd(), '.env');
+            const envPath = path.join(__dirname, '.env');
             if (fs.existsSync(envPath)) {
                let envContent = fs.readFileSync(envPath, 'utf8');
                envContent = envContent.replace(
@@ -239,11 +239,30 @@ async function stageVideoForInstagram(videoPath, options = {}) {
   // recovery branch), spin up the tunnel, mint a token-gated URL, and pass
   // that to Meta. Falls back to anonymous hosts only when the tunnel fails
   // AND options.allowAnonymousHostFallback === true (default false now).
-  const hostMode = (options.publicHostMode || process.env.INSTAGRAM_PUBLIC_HOST_MODE || 'cloudflared').toLowerCase();
-  // Default: anonymous fallback is ALLOWED so a single tunnel hiccup never
+  const hostMode = (options.publicHostMode || process.env.INSTAGRAM_PUBLIC_HOST_MODE || 'anonymous').toLowerCase();
+  // Default: anonymous fallback is ALLOWED so a single host hiccup never
   // blocks the batch. To strictly forbid the anonymous path, set
   // INSTAGRAM_STRICT_CLEAN_HOST=1 or pass options.allowAnonymousHostFallback=false.
   const allowAnonFallback = options.allowAnonymousHostFallback !== false && process.env.INSTAGRAM_STRICT_CLEAN_HOST !== '1';
+
+  // Phase 6.2 — GitHub Releases as clean-origin IG host (no card, 2GB/file,
+  // unmetered, github.com origin → not Meta-flagged like catbox).
+  if (hostMode === 'github_releases' || hostMode === 'github-releases' || hostMode === 'gh-releases') {
+    try {
+      const releases = require('./lib/github-releases-host');
+      const r = await releases.uploadToReleases(videoPath, { title: path.basename(videoPath), notes: 'IG public-host upload (auto)' });
+      if (r.ok) {
+        return { publicVideoUrl: r.url, publicFileName: path.basename(videoPath), hostProvider: 'github-releases' };
+      }
+      console.log(`   ⚠  github-releases host failed: ${r.reason.slice(0, 200)}`);
+      if (!allowAnonFallback) throw new Error(`Instagram public host failed (mode=github_releases, no anon fallback): ${r.reason}`);
+      // Fall through to next strategy.
+    } catch (e) {
+      console.log(`   ⚠  github-releases host threw: ${(e && e.message || e).slice(0, 200)}`);
+      if (!allowAnonFallback) throw e;
+    }
+  }
+
   if (hostMode === 'cloudflared') {
     try {
       const tunnelMgr = require('./lib/cloudflared-tunnel-singleton');
@@ -331,9 +350,56 @@ async function fetchPublishedMediaInfo(mediaId) {
   }
 }
 
+async function proactivelyRefreshAccessToken() {
+  const token = getAccessToken();
+  const appId = process.env.INSTAGRAM_APP_ID;
+  const appSecret = process.env.INSTAGRAM_APP_SECRET;
+  if (!token || !appId || !appSecret) {
+    return; // Cannot proactively refresh if credentials are not configured
+  }
+  try {
+    const debugUrl = `${GRAPH_BASE}/debug_token?input_token=${token}&access_token=${token}`;
+    const res = await fetch(debugUrl);
+    const data = await parseJson(res);
+    if (res.ok && data && data.data) {
+      const expiresAt = Number(data.data.expires_at || 0) * 1000;
+      if (expiresAt === 0) {
+        return; // Page or System User token never expires, no need to refresh!
+      }
+      const timeRemainingMs = expiresAt - Date.now();
+      const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
+      if (timeRemainingMs < fifteenDaysMs) {
+        console.warn(`   ⚠️ IG Token has less than 15 days remaining. Proactively rotating token...`);
+        const rotateUrl = `${GRAPH_BASE}/${API_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${token}`;
+        const rotateRes = await fetch(rotateUrl);
+        const rotateData = await parseJson(rotateRes);
+        if (rotateData && rotateData.access_token) {
+          console.log(`   🔄 Token rotated proactively! Saving to environment.`);
+          process.env.INSTAGRAM_ACCESS_TOKEN = rotateData.access_token;
+          
+          const envPath = path.join(__dirname, '.env');
+          if (fs.existsSync(envPath)) {
+            let envContent = fs.readFileSync(envPath, 'utf8');
+            envContent = envContent.replace(
+              /INSTAGRAM_ACCESS_TOKEN=.*/g, 
+              `INSTAGRAM_ACCESS_TOKEN="${rotateData.access_token}"`
+            );
+            fs.writeFileSync(envPath, envContent);
+            console.log(`   🔄 Successfully wrote the refreshed token to .env!`);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`   ⚠️ Proactive token refresh encountered an error: ${err.message}`);
+  }
+}
+
 async function testInstagramAuth() {
   try {
     ensureConfigured();
+    // Proactively refresh before test auth
+    await proactivelyRefreshAccessToken();
     const profile = await graphRequest('GET', getInstagramUserId(), { fields: 'id,username' });
     console.log('OK Instagram authentication successful');
     console.log(`   Account: ${profile.username || profile.id}`);
@@ -345,6 +411,11 @@ async function testInstagramAuth() {
 }
 
 async function uploadToInstagram(videoPath, caption, options = {}) {
+  // Proactively check and refresh the access token
+  try {
+    await proactivelyRefreshAccessToken();
+  } catch (_) {}
+
   if (!options.skipPermitCheck) {
     assertPublishPermit(options, { platform: 'instagram_reels', videoPath });
   }
@@ -406,8 +477,17 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
       const container = await createReelContainer(caption, staged.publicVideoUrl, options);
       console.log(`   Container: ${container.id}`);
 
-      await waitForContainerFinish(container.id, options);
-      console.log('   Container ready for publish');
+      try {
+        await waitForContainerFinish(container.id, options);
+        console.log('   Container ready for publish');
+      } catch (statusErr) {
+        if (/Authorization Error|subcode 33/i.test(statusErr.message)) {
+          console.log('   ⚠️ Meta blocked container status query; sleeping 30s for silent background processing...');
+          await new Promise((resolve) => setTimeout(resolve, 30000));
+        } else {
+          throw statusErr;
+        }
+      }
 
       const published = await publishContainer(container.id);
       const mediaId = published && published.id ? published.id : null;
@@ -442,7 +522,7 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
       // and currently fails with #10 if the token lacks the scope — logged, not fatal.
       const hideCounts = options.hideEngagementCounts !== false;
       if (hideCounts && mediaId) {
-        for (const [field, value] of [['comment_enabled', 'false'], ['like_and_view_counts_disabled', 'true']]) {
+        for (const [field, value] of [['comment_enabled', 'true'], ['like_and_view_counts_disabled', 'true']]) {
           try {
             await graphRequest('POST', mediaId, { [field]: value });
             console.log(`   ${field}=${value} ✓`);
@@ -500,8 +580,165 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
   };
 }
 
+/**
+ * Phase 5.3 — Instagram Carousel (multi-image deck).
+ *
+ * Takes a list of slide specs `[{slideText, visualPrompt}, ...]` (typically
+ * 5 slides from `lib/platform-fanout.js`'s `igCarousel`), and:
+ *   1. Generates one 1080×1080 image per slide:
+ *        - FLUX still via `lib/hero-visual.js` enriched prompt (NVIDIA primary, HF fallback)
+ *        - ffmpeg `drawtext` overlay rendering the slideText at the bottom 30%
+ *   2. Stages each image via `public-video-host` (or the configured base URL)
+ *   3. Creates 5 child IG containers (`media_type=IMAGE`, `is_carousel_item=true`)
+ *   4. Creates the parent carousel container (`media_type=CAROUSEL_ALBUM`, `children=joined`)
+ *   5. Publishes via /media_publish.
+ *
+ * Skips per-call metadata-uniqueness gate by default (caller controls).
+ *
+ * @param {object} opts
+ * @param {Array<{slideText:string, visualPrompt:string}>} opts.slides   3-10 slides
+ * @param {string} opts.caption                                         Up to 2200-char caption
+ * @param {object} [opts.publishPermit]                                  publish-lock permit
+ * @param {boolean} [opts.skipMetadataUniqueGate=true]                   default true since the carousel caption is meant to echo the Reel
+ * @returns {{success:boolean, mediaId?:string, permalink?:string, error?:string}}
+ */
+async function uploadCarousel(opts = {}) {
+  if (!isInstagramConfigured()) return { success: false, error: 'instagram_not_configured' };
+  const slides = Array.isArray(opts.slides) ? opts.slides : [];
+  if (slides.length < 3 || slides.length > 10) return { success: false, error: `carousel_needs_3_to_10_slides; got ${slides.length}` };
+  const caption = String(opts.caption || '').slice(0, 2200);
+
+  const path = require('path');
+  const fs = require('fs');
+  const { spawnSync } = require('child_process');
+  const FFMPEG = (() => { try { return require('ffmpeg-static'); } catch (_) { return 'ffmpeg'; } })();
+  const ROOT = path.resolve(__dirname);
+  const CACHE_DIR = path.join(ROOT, '.runtime-cache', 'ig-carousel');
+  try { fs.mkdirSync(CACHE_DIR, { recursive: true }); } catch (_) {}
+
+  console.log(`\nIG Carousel Upload Starting (${slides.length} slides)`);
+
+  // ── 1. Generate each slide image via hero-visual + drawtext overlay ────
+  const hero = require('./lib/hero-visual');
+  const slidePaths = [];
+  for (let i = 0; i < slides.length; i++) {
+    const s = slides[i];
+    const slideKey = require('crypto').createHash('sha1').update(`${s.slideText}|${s.visualPrompt}`).digest('hex').slice(0, 12);
+    const stillPath = path.join(CACHE_DIR, `slide-${i + 1}-${slideKey}-still.png`);
+    const finalPath = path.join(CACHE_DIR, `slide-${i + 1}-${slideKey}.jpg`);
+
+    if (!fs.existsSync(finalPath)) {
+      // 1a. Get the background still — pass via hero-visual since it already
+      //     handles NVIDIA FLUX → Pollinations → HF FLUX failover.
+      //     We pass a fake beat shape because hero.heroVisual() expects it.
+      if (!fs.existsSync(stillPath)) {
+        const heroResult = await hero.heroVisual({
+          beat: { voiceover: '', visualPrompt: s.visualPrompt, totalBeats: 1 },
+          scriptContext: { topic: caption.slice(0, 60), totalBeats: 1 },
+          durationSec: 1.0,
+          beatIndex: 0,
+          outputPath: path.join(CACHE_DIR, `slide-${i + 1}-${slideKey}-motion.mp4`),
+        }).catch((e) => ({ ok: false, reason: String(e && e.message || e) }));
+        if (!heroResult.ok || !heroResult.stillPath || !fs.existsSync(heroResult.stillPath)) {
+          return { success: false, error: `slide_${i + 1}_hero_failed: ${heroResult.reason}` };
+        }
+        try { fs.copyFileSync(heroResult.stillPath, stillPath); } catch (_) {}
+      }
+
+      // 1b. Resize to 1080×1080 square + drawtext overlay.
+      // Escape for ffmpeg drawtext filter (colons + special chars).
+      const escapedText = String(s.slideText || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:').replace(/%/g, '\\%').slice(0, 90);
+      const drawText = `drawtext=text='${escapedText}':fontsize=64:fontcolor=white:borderw=4:bordercolor=black@0.9:x=(w-text_w)/2:y=h-260:line_spacing=8`;
+      const r = spawnSync(FFMPEG, [
+        '-y', '-i', stillPath,
+        '-vf', `scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080,${drawText}`,
+        '-q:v', '2', finalPath,
+      ], { encoding: 'utf8' });
+      if (r.status !== 0 || !fs.existsSync(finalPath)) {
+        return { success: false, error: `slide_${i + 1}_ffmpeg_failed: ${(r.stderr || '').slice(-200)}` };
+      }
+    }
+    slidePaths.push(finalPath);
+    console.log(`   slide ${i + 1}/${slides.length} ready: ${path.basename(finalPath)}`);
+  }
+
+  // ── 2. Stage each slide via public-video-host (anonymous file host is fine for images) ──
+  const { uploadToPublicHost } = require('./public-video-host');
+  const publicUrls = [];
+  for (let i = 0; i < slidePaths.length; i++) {
+    const r = await uploadToPublicHost(slidePaths[i], { allowSingleUseHosts: true });
+    if (!r || !r.url) return { success: false, error: `slide_${i + 1}_host_failed` };
+    publicUrls.push(r.url);
+    console.log(`   slide ${i + 1} hosted: ${r.url.slice(0, 60)}...`);
+  }
+
+  // ── 3. Create child IMAGE containers (is_carousel_item=true) ───────────
+  const childIds = [];
+  for (let i = 0; i < publicUrls.length; i++) {
+    try {
+      const data = await graphRequest('POST', `${getInstagramUserId()}/media`, {
+        image_url: publicUrls[i],
+        is_carousel_item: 'true',
+      });
+      if (!data || !data.id) return { success: false, error: `child_${i + 1}_no_id` };
+      childIds.push(data.id);
+      console.log(`   child ${i + 1}/${publicUrls.length} container: ${data.id}`);
+      await sleep(800);
+    } catch (e) {
+      return { success: false, error: `child_${i + 1}_threw: ${(e && e.message || e).slice(0, 180)}` };
+    }
+  }
+
+  // ── 4. Create parent CAROUSEL_ALBUM container ──────────────────────────
+  let parent;
+  try {
+    parent = await graphRequest('POST', `${getInstagramUserId()}/media`, {
+      media_type: 'CAROUSEL_ALBUM',
+      children: childIds.join(','),
+      caption,
+    });
+  } catch (e) { return { success: false, error: `carousel_parent_threw: ${(e && e.message || e).slice(0, 180)}` }; }
+  if (!parent || !parent.id) return { success: false, error: 'carousel_parent_no_id' };
+  console.log(`   carousel parent: ${parent.id}`);
+
+  // Wait for processing
+  try {
+    await waitForContainerFinish(parent.id, opts);
+    console.log('   Carousel container ready for publish');
+  } catch (e) {
+    return { success: false, error: `carousel_wait_failed: ${(e && e.message || e).slice(0, 180)}` };
+  }
+
+  // ── 5. Publish ─────────────────────────────────────────────────────────
+  let published;
+  try {
+    published = await publishContainer(parent.id);
+  } catch (e) { return { success: false, error: `carousel_publish_threw: ${(e && e.message || e).slice(0, 180)}` }; }
+  const mediaId = published && published.id;
+  if (!mediaId) return { success: false, error: 'carousel_publish_no_id' };
+  const mediaInfo = await fetchPublishedMediaInfo(mediaId).catch(() => null);
+  const permalink = mediaInfo && (mediaInfo.permalink || (mediaInfo.shortcode && `https://www.instagram.com/p/${mediaInfo.shortcode}/`));
+
+  console.log(`   OK Carousel publish successful → ${permalink || mediaId}`);
+
+  // Optional: hide engagement counts post-publish (same as Reel path)
+  if (opts.hideEngagementCounts !== false && mediaId) {
+    for (const [field, value] of [['comment_enabled', 'false'], ['like_and_view_counts_disabled', 'true']]) {
+      try {
+        await graphRequest('POST', mediaId, { [field]: value });
+        console.log(`   ${field}=${value} ✓`);
+      } catch (e) {
+        console.log(`   ${field}=${value} skipped: ${String(e && e.message || e).slice(0, 120)}`);
+      }
+    }
+  }
+
+  return { success: true, mediaId, permalink, parentContainerId: parent.id, childContainerIds: childIds, platform: 'instagram_carousel' };
+}
+
 module.exports = {
   isInstagramConfigured,
   testInstagramAuth,
   uploadToInstagram,
+  uploadCarousel,
 };
