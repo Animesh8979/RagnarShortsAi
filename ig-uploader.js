@@ -109,9 +109,9 @@ async function parseJson(response) {
   }
 }
 
-async function graphRequest(method, resourcePath, params = {}) {
+async function graphRequest(method, resourcePath, params = {}, callOptions = {}) {
   const url = buildGraphUrl(resourcePath);
-  const requestParams = { ...params, access_token: getAccessToken() };
+  const requestParams = { ...params, access_token: getAccessToken(callOptions) };
   const options = { method, headers: {} };
 
   let finalUrl = url;
@@ -145,7 +145,7 @@ async function graphRequest(method, resourcePath, params = {}) {
       const appSecret = process.env.INSTAGRAM_APP_SECRET;
       if (appId && appSecret) {
         try {
-          const rotateUrl = `${GRAPH_BASE.replace(/\/$/, '')}/${API_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${getAccessToken()}`;
+          const rotateUrl = `${GRAPH_BASE.replace(/\/$/, '')}/${API_VERSION}/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${getAccessToken(callOptions)}`;
           const rotateRes = await fetch(rotateUrl);
           const rotateData = await parseJson(rotateRes);
           if (rotateData.access_token) {
@@ -307,13 +307,13 @@ async function sleep(ms) {
 }
 
 async function createReelContainer(caption, publicVideoUrl, options = {}) {
-  const data = await graphRequest('POST', `${getInstagramUserId()}/media`, {
+  const data = await graphRequest('POST', `${getInstagramUserId(options)}/media`, {
     media_type: 'REELS',
     video_url: publicVideoUrl,
     caption,
     share_to_feed: options.shareToFeed === false ? 'false' : 'true',
     thumb_offset: options.thumbOffsetMs,
-  });
+  }, options);
   if (!data || !data.id) {
     throw new Error('Instagram did not return a valid creation id.');
   }
@@ -326,7 +326,7 @@ async function waitForContainerFinish(containerId, options = {}) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const status = await graphRequest('GET', containerId, { fields: 'status_code,status' });
+    const status = await graphRequest('GET', containerId, { fields: 'status_code,status' }, options);
     const code = String(status.status_code || '').toUpperCase();
     if (code === 'FINISHED') return status;
     if (code === 'ERROR' || code === 'EXPIRED') {
@@ -338,13 +338,13 @@ async function waitForContainerFinish(containerId, options = {}) {
   throw new Error(`Instagram container ${containerId} did not finish within ${Math.round(timeoutMs / 1000)} seconds.`);
 }
 
-async function publishContainer(containerId) {
-  return graphRequest('POST', `${getInstagramUserId()}/media_publish`, { creation_id: containerId });
+async function publishContainer(containerId, options = {}) {
+  return graphRequest('POST', `${getInstagramUserId(options)}/media_publish`, { creation_id: containerId }, options);
 }
 
-async function fetchPublishedMediaInfo(mediaId) {
+async function fetchPublishedMediaInfo(mediaId, options = {}) {
   try {
-    return await graphRequest('GET', mediaId, { fields: 'id,permalink,shortcode,media_product_type' });
+    return await graphRequest('GET', mediaId, { fields: 'id,permalink,shortcode,media_product_type' }, options);
   } catch (_) {
     return null;
   }
@@ -395,12 +395,12 @@ async function proactivelyRefreshAccessToken() {
   }
 }
 
-async function testInstagramAuth() {
+async function testInstagramAuth(opts = {}) {
   try {
-    ensureConfigured();
+    ensureConfigured(opts);
     // Proactively refresh before test auth
     await proactivelyRefreshAccessToken();
-    const profile = await graphRequest('GET', getInstagramUserId(), { fields: 'id,username' });
+    const profile = await graphRequest('GET', getInstagramUserId(opts), { fields: 'id,username' }, opts);
     console.log('OK Instagram authentication successful');
     console.log(`   Account: ${profile.username || profile.id}`);
     return true;
@@ -411,6 +411,13 @@ async function testInstagramAuth() {
 }
 
 async function uploadToInstagram(videoPath, caption, options = {}) {
+  // L107 lane-aware: getAccessToken(options) + getInstagramUserId(options) plumb
+  // INSTAGRAM_ACCESS_TOKEN_ORGANIC/_CLIPS + INSTAGRAM_USER_ID_ORGANIC/_CLIPS
+  // based on options.channelLabel ('organic' or 'clip'). DO NOT mutate process.env —
+  // that cross-contaminates between sequential organic/clip uploads.
+  const resolvedLabel = String(options.channelLabel || '').toLowerCase();
+  console.log(`   IG lane: ${resolvedLabel || '(default)'} → user-id ${getInstagramUserId(options)}`);
+
   // Proactively check and refresh the access token
   try {
     await proactivelyRefreshAccessToken();
@@ -489,9 +496,9 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
         }
       }
 
-      const published = await publishContainer(container.id);
+      const published = await publishContainer(container.id, options);
       const mediaId = published && published.id ? published.id : null;
-      const mediaInfo = mediaId ? await fetchPublishedMediaInfo(mediaId) : null;
+      const mediaInfo = mediaId ? await fetchPublishedMediaInfo(mediaId, options) : null;
       const permalink = mediaInfo && mediaInfo.permalink
         ? mediaInfo.permalink
         : mediaInfo && mediaInfo.shortcode
@@ -524,7 +531,7 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
       if (hideCounts && mediaId) {
         for (const [field, value] of [['comment_enabled', 'true'], ['like_and_view_counts_disabled', 'true']]) {
           try {
-            await graphRequest('POST', mediaId, { [field]: value });
+            await graphRequest('POST', mediaId, { [field]: value }, options);
             console.log(`   ${field}=${value} ✓`);
           } catch (e) {
             const msg = String(e && e.message || e).slice(0, 160);
@@ -603,7 +610,7 @@ async function uploadToInstagram(videoPath, caption, options = {}) {
  * @returns {{success:boolean, mediaId?:string, permalink?:string, error?:string}}
  */
 async function uploadCarousel(opts = {}) {
-  if (!isInstagramConfigured()) return { success: false, error: 'instagram_not_configured' };
+  if (!isInstagramConfigured(opts)) return { success: false, error: 'instagram_not_configured' };
   const slides = Array.isArray(opts.slides) ? opts.slides : [];
   if (slides.length < 3 || slides.length > 10) return { success: false, error: `carousel_needs_3_to_10_slides; got ${slides.length}` };
   const caption = String(opts.caption || '').slice(0, 2200);
@@ -676,10 +683,10 @@ async function uploadCarousel(opts = {}) {
   const childIds = [];
   for (let i = 0; i < publicUrls.length; i++) {
     try {
-      const data = await graphRequest('POST', `${getInstagramUserId()}/media`, {
+      const data = await graphRequest('POST', `${getInstagramUserId(opts)}/media`, {
         image_url: publicUrls[i],
         is_carousel_item: 'true',
-      });
+      }, opts);
       if (!data || !data.id) return { success: false, error: `child_${i + 1}_no_id` };
       childIds.push(data.id);
       console.log(`   child ${i + 1}/${publicUrls.length} container: ${data.id}`);
@@ -692,11 +699,11 @@ async function uploadCarousel(opts = {}) {
   // ── 4. Create parent CAROUSEL_ALBUM container ──────────────────────────
   let parent;
   try {
-    parent = await graphRequest('POST', `${getInstagramUserId()}/media`, {
+    parent = await graphRequest('POST', `${getInstagramUserId(opts)}/media`, {
       media_type: 'CAROUSEL_ALBUM',
       children: childIds.join(','),
       caption,
-    });
+    }, opts);
   } catch (e) { return { success: false, error: `carousel_parent_threw: ${(e && e.message || e).slice(0, 180)}` }; }
   if (!parent || !parent.id) return { success: false, error: 'carousel_parent_no_id' };
   console.log(`   carousel parent: ${parent.id}`);
@@ -712,11 +719,11 @@ async function uploadCarousel(opts = {}) {
   // ── 5. Publish ─────────────────────────────────────────────────────────
   let published;
   try {
-    published = await publishContainer(parent.id);
+    published = await publishContainer(parent.id, opts);
   } catch (e) { return { success: false, error: `carousel_publish_threw: ${(e && e.message || e).slice(0, 180)}` }; }
   const mediaId = published && published.id;
   if (!mediaId) return { success: false, error: 'carousel_publish_no_id' };
-  const mediaInfo = await fetchPublishedMediaInfo(mediaId).catch(() => null);
+  const mediaInfo = await fetchPublishedMediaInfo(mediaId, opts).catch(() => null);
   const permalink = mediaInfo && (mediaInfo.permalink || (mediaInfo.shortcode && `https://www.instagram.com/p/${mediaInfo.shortcode}/`));
 
   console.log(`   OK Carousel publish successful → ${permalink || mediaId}`);
@@ -725,7 +732,7 @@ async function uploadCarousel(opts = {}) {
   if (opts.hideEngagementCounts !== false && mediaId) {
     for (const [field, value] of [['comment_enabled', 'false'], ['like_and_view_counts_disabled', 'true']]) {
       try {
-        await graphRequest('POST', mediaId, { [field]: value });
+        await graphRequest('POST', mediaId, { [field]: value }, opts);
         console.log(`   ${field}=${value} ✓`);
       } catch (e) {
         console.log(`   ${field}=${value} skipped: ${String(e && e.message || e).slice(0, 120)}`);
