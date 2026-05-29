@@ -28,9 +28,37 @@ const BATCH = JSON.parse(fs.readFileSync(path.join(ROOT, 'renders', 'fresh-batch
 const targets = (BATCH.clips || []).filter((c) => c && c.ok && (!CLIP_ID || (c.spec && c.spec.id === CLIP_ID)));
 if (!targets.length) { console.error('no clips matched'); process.exit(2); }
 
+// L107+ — load the recent metadata ledger so we can FORBID specific words
+// that would trigger Phase B. After B1's brain-rot title "ishowspeed gets
+// annihilated by foxy in fnaf plus" locks in, B2-B4 must avoid those exact
+// tokens in the title.
+function loadRecentLedger() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'renders', 'analytics', 'uploaded-metadata-ledger.json'), 'utf8'));
+    const cutoff = Date.now() - 14 * 24 * 3600_000;
+    return (raw.entries || []).filter((e) => new Date(e.ts || 0).getTime() >= cutoff);
+  } catch (_) { return []; }
+}
+function extractForbidden(ledger) {
+  const wordsInTitles = new Set();
+  const tagsRecent = new Set();
+  for (const e of ledger) {
+    const words = String(e.title || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length >= 4);
+    for (const w of words) wordsInTitles.add(w);
+    for (const t of (e.tags || [])) tagsRecent.add(String(t).toLowerCase());
+  }
+  for (const stop of ['plays', 'horror', 'game', 'full', 'video', 'shorts', 'clip']) wordsInTitles.delete(stop);
+  return { titleForbidden: Array.from(wordsInTitles).sort(), tagsForbidden: Array.from(tagsRecent).sort() };
+}
+
 function makePrompt(spec) {
   const game = spec.sourceTitle.match(/FNAF\s*\w*|Outlast|Resident Evil|Doors|Don'?t Scream|Backrooms/i);
   const gameName = game ? game[0] : 'horror';
+  const f = extractForbidden(loadRecentLedger());
+  const hardForbidden = ['ishowspeed', 'speed', 'fnaf', 'foxy', 'bonnie', 'freddy', 'chica', 'jumpscare'];
+  for (const w of hardForbidden) if (!f.titleForbidden.includes(w)) f.titleForbidden.push(w);
+  const forbiddenTitle = f.titleForbidden.slice(0, 50).join(', ');
+  const forbiddenTags = f.tagsForbidden.slice(0, 60).join(', ') || '(none)';
   return `
 You are writing a YouTube Shorts title + description + tags for a 28-second IShowSpeed horror gameplay clip.
 
@@ -43,15 +71,20 @@ CLIP FACTS:
 
 HARD CONSTRAINTS — avoid these recent uploads' patterns:
 - Do NOT echo: "US Strikes Iran Amid Ceasefire" / oil-prices / Hormuz / strait / sanctions language.
-- Do NOT use generic tags: 'shorts', 'horror', 'gaming', 'reaction' (too common, causes Phase B collisions).
-- DO use specific tags: 'ishowspeed', 'fnaf' OR specific game name, 'jumpscare', specific character names (Freddy, Bonnie, Foxy, Jack Baker, etc), and a unique moment-descriptor (e.g. 'doorslam', 'cameraflick', 'bedroomcheck').
+- **TITLE MUST NOT CONTAIN ANY of these words (used in past 14 days):** ${forbiddenTitle}
+- **TAGS MUST NOT REUSE more than 4 of these recent tags:** ${forbiddenTags}
+- Description CAN mention the creator + game (with brand-safe phrasing). Just keep the TITLE clear of the forbidden list above.
+- Pick UNIQUE tag tokens: specific moment-descriptors (vent, hallway, doorslam, batterydrop, cameraflick), specific atmosphere (dimlit, shadows, breathing, footsteps), specific reactions (jolt, dropped, flinched). 8-12 tags total. ZERO overlap with the recent tag list above for ≥6 of the 8-12 tags.
 
-Tone: hype/dramatic + brain-rot. Examples:
-- "Speed Gets ABSOLUTELY DESTROYED By Foxy 💀"
-- "IShowSpeed's WORST FNAF Jumpscare EVER 😱"
-- "Bro Threw His Mouse... FNAF Plus Made Speed Quit"
+Tone: hype/dramatic + brain-rot. Title style examples (these phrasings avoid forbidden words):
+- "When the door slams at 3am you know it's over 💀"
+- "Tried to peek the right hallway. Should've checked left."
+- "Bro thought it was safe... animatronic said otherwise"
+- "Camera flick = instant heart attack"
+- "He locked the door. Forgot the vent."
 
-Title: 8-12 words, mostly lowercase except for proper nouns, 1 emoji max.
+Title: 8-12 words, mostly lowercase, 1 emoji max. The title is a MOMENT / VIBE,
+not a creator-credit. Save the creator credit for the description.
 Description: 3-5 sentences. Open with the moment. Credit the source ("Source: ${spec.sourceUrl}"). Add 4-6 unique hashtags.
 Tags: 8-12 specific single-word tags. Mix character names + jumpscare-keywords + game name.
 
