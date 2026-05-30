@@ -94,13 +94,43 @@ check('T1 retention-postfx wired in both lanes', () => {
   return 'organic + clip both wired (postfx + kokoro + reaction)';
 });
 
+// ── Tier 2 + Tier 3 ──────────────────────────────────────────────────────
+check('T3.1 whisper-local available (Python + faster-whisper)', () => {
+  const m = require(path.join(ROOT, 'lib', 'whisper-local.js'));
+  if (typeof m.transcribe !== 'function') throw new Error('no transcribe');
+  if (!m.isAvailable()) throw new Error('python/script not found at D:\\python_env');
+  return 'D:\\python_env + tools/whisper_local.py present';
+});
+check('T3.1 whisper-local wired local-first', () => {
+  const wr = fs.readFileSync(path.join(ROOT, 'lib', 'whisper-realign.js'), 'utf8');
+  const cb = fs.readFileSync(path.join(ROOT, 'lib', 'caption-builder.js'), 'utf8');
+  if (!/whisper-local/.test(wr) || !/L110_WHISPER_LOCAL/.test(wr)) throw new Error('not in whisper-realign');
+  if (!/whisper-local/.test(cb)) throw new Error('not in caption-builder');
+  return 'realign + caption-builder both local-first';
+});
+check('T2.1 clip-moment-selector + wired', () => {
+  const m = require(path.join(ROOT, 'lib', 'clip-moment-selector.js'));
+  if (typeof m.selectMoments !== 'function') throw new Error('no selectMoments');
+  const s = fs.readFileSync(path.join(ROOT, 'lib', 'daily-fresh-batch.js'), 'utf8');
+  if (!/clip-moment-selector/.test(s) || !/L110_MOMENT_SELECTOR/.test(s)) throw new Error('not wired in runClipsLane');
+  return 'selectMoments exported + wired';
+});
+check('T2/T3 env flags active', () => {
+  for (const f of ['L110_WHISPER_LOCAL', 'L110_MOMENT_SELECTOR']) if (process.env[f] !== '1') throw new Error(f + ' not 1');
+  if (!process.env.PYTHON_EMBED) throw new Error('PYTHON_EMBED unset');
+  return 'whisper_local + moment_selector ON';
+});
+
 // ── GPU-ban guard (the user's explicit concern) ──────────────────────────
 check('GUARD: no ComfyUI/Forge reference in L110 modules', () => {
-  for (const f of ['clip-creator-ranker', 'platform-variant', 'first-frame-hook', 'seamless-loop', 'kokoro-tts', 'reaction-caption', 'retention-postfx']) {
+  for (const f of ['clip-creator-ranker', 'platform-variant', 'first-frame-hook', 'seamless-loop', 'kokoro-tts', 'reaction-caption', 'retention-postfx', 'whisper-local', 'clip-moment-selector']) {
     const s = fs.readFileSync(path.join(ROOT, 'lib', f + '.js'), 'utf8').toLowerCase();
     if (s.includes('comfyui') || s.includes('forge') || /device:\s*['"]cuda/.test(s)) throw new Error(f + ' references banned GPU tool');
   }
-  return 'zero ComfyUI/Forge/CUDA in L110';
+  // Python whisper must be CPU INT8.
+  const py = fs.readFileSync(path.join(ROOT, 'tools', 'whisper_local.py'), 'utf8');
+  if (!/device="cpu"/.test(py) || /device="cuda"/.test(py)) throw new Error('whisper_local.py not CPU-locked');
+  return 'zero ComfyUI/Forge/CUDA; whisper CPU-locked';
 });
 
 const pass = checks.filter((c) => c.pass).length;
