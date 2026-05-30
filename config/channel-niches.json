@@ -1,0 +1,37 @@
+{
+  "_comment": "L110 T0.1 — channel content strategy. Organic = HARD geopolitics lock. Clip = dynamic performance-weighted (handled by lib/clip-creator-ranker.js, not a fixed list).",
+  "organic": {
+    "channel": "RagnarShortsUltimate",
+    "ig": "ragnar_ultimate007",
+    "mode": "hard_lock",
+    "niche": "geopolitics",
+    "matchKeywords": [
+      "geopolitic", "war", "border", "crossing", "oil", "trade war", "alliance",
+      "strike", "missile", "military", "sanction", "ceasefire", "treaty", "summit",
+      "invasion", "troops", "nuclear", "strait", "blockade", "coup", "regime",
+      "iran", "israel", "ukraine", "russia", "china", "taiwan", "gaza", "nato",
+      "pentagon", "kremlin", "tehran", "beijing", "moscow", "diplomat", "embassy",
+      "tariff", "drone", "warship", "airstrike", "hostage", "rebel", "militia",
+      "conflict", "escalat", "deploy", "defense", "security council", "annex"
+    ],
+    "rejectKeywords": [
+      "recipe", "celebrity gossip", "fashion", "viral pet", "sports score",
+      "box office", "horoscope", "weather forecast"
+    ],
+    "minKeywordHits": 1,
+    "note": "A trending topic must hit >=1 matchKeyword (and 0 strong rejectKeywords) to be scripted. Keeps RagnarShortsUltimate classifiable as a geopolitics channel."
+  },
+  "clip": {
+    "channel": "RagnarShortsAI",
+    "ig": "ragnarautomated",
+    "mode": "dynamic_performance_weighted",
+    "note": "NOT a fixed creator lock (user decision). lib/clip-creator-ranker.js scores the full creator pool by (our per-creator AVD% x views from live analytics) x (current trending velocity), and picks the day's clips from the top. Self-converges on what gains views.",
+    "creatorPool": [
+      "KillTony", "TheoVon", "callherdaddy", "ClubShayShay", "PBDPodcast",
+      "MoistCr1TiKaL", "KaiCenat", "IShowSpeed", "MrBeast"
+    ],
+    "performanceWeight": 0.6,
+    "trendingWeight": 0.4,
+    "coldStartDefaultScore": 50
+  }
+}
