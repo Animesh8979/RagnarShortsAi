@@ -51,42 +51,86 @@ function extractForbidden(ledger) {
   return { titleForbidden: Array.from(wordsInTitles).sort(), tagsForbidden: Array.from(tagsRecent).sort() };
 }
 
+// Detect content type from creator + source title so metadata matches the clip.
+function detectContentType(spec) {
+  const creator = String(spec.sourceCreator || '').toLowerCase();
+  const title = String(spec.sourceTitle || '');
+  if (/ishowspeed|speed/.test(creator) && /FNAF|Outlast|Resident Evil|Doors|Don'?t Scream|Backrooms|horror|scary/i.test(title)) return 'horror';
+  if (/killtony|theovon|callherdaddy|clubshayshay|pbdpodcast|joerogan|lexfridman/.test(creator)) return 'podcast';
+  if (/moistcr1tikal|penguinz0/.test(creator)) return 'reaction';
+  if (/mrbeast/.test(creator)) return 'challenge';
+  if (/kaicenat/.test(creator)) return 'streamer';
+  return 'general';
+}
+
 function makePrompt(spec) {
-  const game = spec.sourceTitle.match(/FNAF\s*\w*|Outlast|Resident Evil|Doors|Don'?t Scream|Backrooms/i);
-  const gameName = game ? game[0] : 'horror';
+  const type = detectContentType(spec);
   const f = extractForbidden(loadRecentLedger());
-  const hardForbidden = ['ishowspeed', 'speed', 'fnaf', 'foxy', 'bonnie', 'freddy', 'chica', 'jumpscare'];
-  for (const w of hardForbidden) if (!f.titleForbidden.includes(w)) f.titleForbidden.push(w);
   const forbiddenTitle = f.titleForbidden.slice(0, 50).join(', ');
   const forbiddenTags = f.tagsForbidden.slice(0, 60).join(', ') || '(none)';
+  const creator = spec.sourceCreator || 'creator';
+
+  const TYPE_GUIDES = {
+    horror: {
+      desc: `a ${creator} HORROR gameplay reaction clip`,
+      tone: 'hype/dramatic, jumpscare energy',
+      examples: ['"when the door slams at 3am you know it\'s over 💀"', '"camera flick = instant heart attack"', '"he locked the door. forgot the vent."'],
+      tagHint: 'moment-descriptors (vent, hallway, doorslam), atmosphere (shadows, footsteps), reactions (jolt, flinched)',
+    },
+    podcast: {
+      desc: `a ${creator} podcast/standup-comedy clip`,
+      tone: 'funny, punchy, quote-driven — capture the JOKE or hot take, not horror',
+      examples: ['"he said WHAT on stage 😂"', '"this bit had the whole room crying"', '"nobody saw that punchline coming"'],
+      tagHint: 'guest names, comedy, standup, podcast, the topic of the bit (NO horror words)',
+    },
+    reaction: {
+      desc: `a ${creator} reaction/commentary clip`,
+      tone: 'witty, current-events, deadpan',
+      examples: ['"he could not believe what he just watched"', '"the internet broke over this"'],
+      tagHint: 'reaction, commentary, the subject reacted-to',
+    },
+    challenge: {
+      desc: `a ${creator} challenge/stunt clip`,
+      tone: 'high-stakes, jaw-dropping',
+      examples: ['"$1 vs $1,000,000 and the gap is insane"', '"last to leave wins it all"'],
+      tagHint: 'challenge, money, stunt, the specific feat',
+    },
+    streamer: {
+      desc: `a ${creator} stream highlight clip`,
+      tone: 'chaotic, hype, IRL energy',
+      examples: ['"chat was NOT ready for this"', '"the stream went off the rails"'],
+      tagHint: 'stream, IRL, the moment',
+    },
+    general: {
+      desc: `a ${creator} viral clip`,
+      tone: 'punchy, curiosity-driven',
+      examples: ['"you won\'t believe what happens next"', '"this moment went viral for a reason"'],
+      tagHint: 'the specific subject of the clip',
+    },
+  };
+  const g = TYPE_GUIDES[type] || TYPE_GUIDES.general;
+
   return `
-You are writing a YouTube Shorts title + description + tags for a 28-second IShowSpeed horror gameplay clip.
+You are writing a YouTube Shorts title + description + tags for ${g.desc} (28 seconds, cut from a longer video).
 
 CLIP FACTS:
-  Game: ${gameName}
-  Source: ${spec.sourceTitle}
+  Creator: ${creator}
+  Source title: ${spec.sourceTitle}
   Cut from: ${Math.floor(spec.startSec / 60)}:${String(Math.floor(spec.startSec) % 60).padStart(2, '0')} mark
-  Duration: ${spec.durationSec}s
-  Creator: IShowSpeed
+  Content type: ${type}
 
-HARD CONSTRAINTS — avoid these recent uploads' patterns:
-- Do NOT echo: "US Strikes Iran Amid Ceasefire" / oil-prices / Hormuz / strait / sanctions language.
+HARD CONSTRAINTS:
+- Title MUST match the ACTUAL content type (${type}). Do NOT use horror words on a comedy/podcast clip or vice-versa.
 - **TITLE MUST NOT CONTAIN ANY of these words (used in past 14 days):** ${forbiddenTitle}
 - **TAGS MUST NOT REUSE more than 4 of these recent tags:** ${forbiddenTags}
-- Description CAN mention the creator + game (with brand-safe phrasing). Just keep the TITLE clear of the forbidden list above.
-- Pick UNIQUE tag tokens: specific moment-descriptors (vent, hallway, doorslam, batterydrop, cameraflick), specific atmosphere (dimlit, shadows, breathing, footsteps), specific reactions (jolt, dropped, flinched). 8-12 tags total. ZERO overlap with the recent tag list above for ≥6 of the 8-12 tags.
+- No angle brackets < > anywhere. No control characters.
 
-Tone: hype/dramatic + brain-rot. Title style examples (these phrasings avoid forbidden words):
-- "When the door slams at 3am you know it's over 💀"
-- "Tried to peek the right hallway. Should've checked left."
-- "Bro thought it was safe... animatronic said otherwise"
-- "Camera flick = instant heart attack"
-- "He locked the door. Forgot the vent."
+Tone: ${g.tone}. Title examples for this type:
+${g.examples.map((e) => '  - ' + e).join('\n')}
 
-Title: 8-12 words, mostly lowercase, 1 emoji max. The title is a MOMENT / VIBE,
-not a creator-credit. Save the creator credit for the description.
-Description: 3-5 sentences. Open with the moment. Credit the source ("Source: ${spec.sourceUrl}"). Add 4-6 unique hashtags.
-Tags: 8-12 specific single-word tags. Mix character names + jumpscare-keywords + game name.
+Title: 8-12 words, mostly lowercase, 1 emoji max, a MOMENT/VIBE (not a creator credit).
+Description: 3-5 sentences opening with the moment. Credit the source ("Source: ${spec.sourceUrl} — ${creator}"). 4-6 unique hashtags.
+Tags: 8-12 specific single-word tags — ${g.tagHint}. ≥6 must NOT appear in the recent tag list above.
 
 Return STRICT JSON. No markdown:
 {
