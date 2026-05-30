@@ -121,16 +121,42 @@ check('T2/T3 env flags active', () => {
   return 'whisper_local + moment_selector ON';
 });
 
+// ── Tier 4 (polish) ───────────────────────────────────────────────────────
+check('T4.2 thumbnail-gen exports generateCover', () => {
+  const m = require(path.join(ROOT, 'lib', 'thumbnail-gen.js'));
+  if (typeof m.generateCover !== 'function') throw new Error('no generateCover');
+  return 'best-frame cover generator';
+});
+check('T4 scene-detect (PySceneDetect) available + exports', () => {
+  const m = require(path.join(ROOT, 'lib', 'scene-detect.js'));
+  if (typeof m.detectScenes !== 'function') throw new Error('no detectScenes');
+  if (!m.isAvailable()) throw new Error('python/scene_detect.py not found');
+  const py = fs.readFileSync(path.join(ROOT, 'tools', 'scene_detect.py'), 'utf8');
+  if (!/ContentDetector/.test(py)) throw new Error('scene_detect.py missing ContentDetector');
+  return 'detectScenes + D:\\python_env + ContentDetector';
+});
+check('T2.2 real auto-editor wired into compress() w/ fallback', () => {
+  const m = require(path.join(ROOT, 'lib', 'auto-editor-compress.js'));
+  if (typeof m.realAutoEditor !== 'function') throw new Error('realAutoEditor not exported');
+  const s = fs.readFileSync(path.join(ROOT, 'lib', 'auto-editor-compress.js'), 'utf8');
+  if (!/L110_REAL_AUTOEDITOR/.test(s)) throw new Error('not gated/wired in compress()');
+  if (!/auto_editor/.test(s)) throw new Error('does not invoke auto_editor');
+  if (!/detectSilence/.test(s)) throw new Error('ffmpeg fallback removed');
+  return 'auto-editor primary + ffmpeg-silence fallback';
+});
+
 // ── GPU-ban guard (the user's explicit concern) ──────────────────────────
 check('GUARD: no ComfyUI/Forge reference in L110 modules', () => {
-  for (const f of ['clip-creator-ranker', 'platform-variant', 'first-frame-hook', 'seamless-loop', 'kokoro-tts', 'reaction-caption', 'retention-postfx', 'whisper-local', 'clip-moment-selector']) {
+  for (const f of ['clip-creator-ranker', 'platform-variant', 'first-frame-hook', 'seamless-loop', 'kokoro-tts', 'reaction-caption', 'retention-postfx', 'whisper-local', 'clip-moment-selector', 'scene-detect', 'thumbnail-gen']) {
     const s = fs.readFileSync(path.join(ROOT, 'lib', f + '.js'), 'utf8').toLowerCase();
     if (s.includes('comfyui') || s.includes('forge') || /device:\s*['"]cuda/.test(s)) throw new Error(f + ' references banned GPU tool');
   }
-  // Python whisper must be CPU INT8.
+  // Python whisper + scene_detect must be CPU. (scene_detect uses opencv-headless CPU.)
   const py = fs.readFileSync(path.join(ROOT, 'tools', 'whisper_local.py'), 'utf8');
   if (!/device="cpu"/.test(py) || /device="cuda"/.test(py)) throw new Error('whisper_local.py not CPU-locked');
-  return 'zero ComfyUI/Forge/CUDA; whisper CPU-locked';
+  const sd = fs.readFileSync(path.join(ROOT, 'tools', 'scene_detect.py'), 'utf8').toLowerCase();
+  if (sd.includes('cuda') || sd.includes('gpu')) throw new Error('scene_detect.py references GPU');
+  return 'zero ComfyUI/Forge/CUDA; whisper+scenedetect CPU-locked';
 });
 
 const pass = checks.filter((c) => c.pass).length;
