@@ -99,20 +99,44 @@ function Captions({ wordBoundaries = [], powerWords = [] }) {
   );
 }
 
-// Per-beat hero clip with a spring scale-in + quick fade so beat changes read
-// as a deliberate "snap" instead of a hard cut. (frame here is Sequence-local.)
-function BeatClip({ src }) {
+// Per-beat hero with CONTINUOUS motion — real animation, not a static-ish stock
+// clip. Every beat gets a Ken Burns push-in (scale ramps across the whole beat)
+// + a slow diagonal parallax pan, a spring entry, and a 6-frame crossfade. So the
+// frame is always moving cinematically even when the underlying visual is a still
+// or a slow stock clip. (frame + durationInFrames are Sequence-local in Remotion.)
+function BeatClip({ src, durationInFrames }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const enter = spring({ frame, fps, config: { damping: 18, stiffness: 140, mass: 0.8 } });
-  const scale = interpolate(enter, [0, 1], [1.06, 1], { extrapolateRight: 'clamp' });
-  const opacity = interpolate(frame, [0, 5], [0, 1], { extrapolateRight: 'clamp' });
+  const total = Math.max(1, durationInFrames || fps * 4);
+  // direction alternates per beat so the pan doesn't feel repetitive
+  const dir = (Math.round(durationInFrames || 0) % 2 === 0) ? 1 : -1;
+  const enter = spring({ frame, fps, config: { damping: 20, stiffness: 130, mass: 0.9 } });
+  const entryScale = interpolate(enter, [0, 1], [1.05, 1], { extrapolateRight: 'clamp' });
+  const kb = interpolate(frame, [0, total], [1.08, 1.18], { extrapolateRight: 'clamp' }); // continuous push-in
+  const panX = interpolate(frame, [0, total], [0, 26 * dir], { extrapolateRight: 'clamp' });
+  const panY = interpolate(frame, [0, total], [0, -16], { extrapolateRight: 'clamp' });
+  const opacity = interpolate(frame, [0, 6], [0, 1], { extrapolateRight: 'clamp' });
   return (
-    <AbsoluteFill style={{ opacity }}>
-      <AbsoluteFill style={{ transform: `scale(${scale})` }}>
+    <AbsoluteFill style={{ opacity, backgroundColor: '#000' }}>
+      <AbsoluteFill style={{ transform: `scale(${(kb * entryScale).toFixed(4)}) translate(${panX.toFixed(1)}px, ${panY.toFixed(1)}px)` }}>
         <Video src={src} startFrom={0} muted />
       </AbsoluteFill>
     </AbsoluteFill>
+  );
+}
+
+// Retention progress bar — a thin brand-colored bar that fills 0→100% across the
+// whole short. Standard viral-edit cue ("how much is left") + constant motion.
+function ProgressBar() {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+  const pct = interpolate(frame, [0, durationInFrames], [0, 100], { extrapolateRight: 'clamp' });
+  return (
+    <div style={{
+      position: 'absolute', top: 0, left: 0, height: 7, width: `${pct}%`,
+      background: `linear-gradient(90deg, #FF3B3B, ${COLORS.warm})`,
+      boxShadow: '0 0 14px rgba(255,210,0,0.75)',
+    }} />
   );
 }
 
@@ -157,10 +181,11 @@ export const V8OrganicComposition = ({
         const dur = Math.max(1, endFrame - startFrame);
         return (
           <Sequence key={i} from={startFrame} durationInFrames={dur} layout="none">
-            <BeatClip src={staticFile(b.heroClip)} />
+            <BeatClip src={staticFile(b.heroClip)} durationInFrames={dur} />
           </Sequence>
         );
       })}
+      <ProgressBar />
       <Captions wordBoundaries={wordBoundaries} powerWords={powerWords} />
       <BrandWordmark brand={brand} />
       {audioFile ? <Audio src={staticFile(audioFile)} /> : null}
