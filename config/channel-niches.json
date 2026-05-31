@@ -30,8 +30,14 @@
       "KillTony", "TheoVon", "callherdaddy", "ClubShayShay", "PBDPodcast",
       "MoistCr1TiKaL", "KaiCenat", "IShowSpeed", "MrBeast"
     ],
-    "performanceWeight": 0.6,
-    "trendingWeight": 0.4,
-    "coldStartDefaultScore": 50
+    "performanceWeight": 0.45,
+    "trendingWeight": 0.2,
+    "brainrotWeight": 0.35,
+    "coldStartDefaultScore": 50,
+    "brainrotNote": "Editorial prior on how FUNNY/chaotic/brain-rot a creator is (user: clips were 'not funny not brainrot' — dry gossip/politics podcasts kept winning the flat cold-start ranker). High = comedy/chaos/viral moments; low = talking-head interview/politics. Dominates at cold-start, fades as live analytics (performanceWeight) accumulate.",
+    "brainrotScores": {
+      "IShowSpeed": 96, "KaiCenat": 92, "MrBeast": 90, "MoistCr1TiKaL": 86,
+      "KillTony": 84, "TheoVon": 76, "ClubShayShay": 52, "callherdaddy": 48, "PBDPodcast": 42
+    }
   }
 }
