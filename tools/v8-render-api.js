@@ -48,10 +48,12 @@ async function main() {
   });
   console.log('[render-api] bundle done in', Math.round((Date.now() - t0) / 1000) + 's');
 
-  console.log('[render-api] selecting composition');
+  // ORGANIC_MOTION=1 → custom motion-graphics composition; default = proven path.
+  const compositionId = process.env.ORGANIC_MOTION === '1' ? 'V8MotionComposition' : 'V8OrganicComposition';
+  console.log('[render-api] selecting composition: ' + compositionId);
   const composition = await selectComposition({
     serveUrl,
-    id: 'V8OrganicComposition',
+    id: compositionId,
     inputProps,
     browserExecutable: BROWSER_EXE,
     chromeMode: 'headless-shell',
