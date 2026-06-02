@@ -71,6 +71,22 @@ or `crawl4ai` scrape) → a per-match calendar the orchestrator pre-schedules:
 - **T+24h**: analysis + animated goal-recap.
 Velocity-watch already exists → trend-jack upsets/red-cards within minutes.
 
+## Tools locked (researched on GitHub — all $0, no API key, CPU)
+
+- **Fixtures / schedule / groups (the keystone)**: **`openfootball/worldcup.json`** — free,
+  PUBLIC-DOMAIN, **NO API key**, includes Canada/USA/Mexico 2026. Just fetch the raw JSON:
+  `https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json`.
+  → `lib/fifa-schedule.js` is a thin fetch + cache of this. The keystone is now trivial (a GET).
+- **Live in-match scores** (velocity edge): `rezarahiminia/worldcup2026` (free REST, no key) /
+  `thesportsdb.com` (free) / API-Football free tier — poll for goal + final-whistle → fire the
+  existing 15-min priority-batch reaction. First on every result.
+- **Animated goal-recap pitch engine**: **`probberechts/d3-soccer`** (D3 plugin — pitch + pass/
+  shot plotting to SVG), rendered inside Remotion (`useCurrentFrame`-driven) → the category-of-one
+  recap, copyright-proof. `statsbomb/open-data` (free event JSON) as xG/format reference. Also
+  `openfootball/awesome-football` for more free datasets, `awesome-soccer-analytics` for viz patterns.
+- **Multi-language edge**: Edge TTS (40+ languages, free) + Kokoro for the majors → ES/PT/AR/JA/FR.
+- Everything above is free / no-card / CPU / SVG — fits every hard constraint.
+
 ## New bits vs reuse
 - **New**: `config/channel-niches.json` football section (keywords + sources); `lib/fifa-schedule.js`
   (fixtures/lineups/stats via free API); a **pitch-diagram goal-recap** scene (extends the V9/V10
