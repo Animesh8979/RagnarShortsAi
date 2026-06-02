@@ -28,16 +28,16 @@
     "note": "NOT a fixed creator lock (user decision). lib/clip-creator-ranker.js scores the full creator pool by (our per-creator AVD% x views from live analytics) x (current trending velocity), and picks the day's clips from the top. Self-converges on what gains views.",
     "creatorPool": [
       "KillTony", "TheoVon", "callherdaddy", "ClubShayShay", "PBDPodcast",
-      "MoistCr1TiKaL", "KaiCenat", "IShowSpeed", "MrBeast"
+      "MoistCr1TiKaL", "KaiCenat", "IShowSpeed", "MrBeast", "AdinRoss"
     ],
-    "performanceWeight": 0.45,
+    "performanceWeight": 0.4,
     "trendingWeight": 0.2,
-    "brainrotWeight": 0.35,
+    "brainrotWeight": 0.4,
     "coldStartDefaultScore": 50,
-    "brainrotNote": "Editorial prior on how FUNNY/chaotic/brain-rot a creator is (user: clips were 'not funny not brainrot' — dry gossip/politics podcasts kept winning the flat cold-start ranker). High = comedy/chaos/viral moments; low = talking-head interview/politics. Dominates at cold-start, fades as live analytics (performanceWeight) accumulate.",
+    "brainrotNote": "Editorial FUNNY/chaos prior (user: 'funny ones of high-end streamers hit big — target that'). High = laugh-out-loud reactions / comedic chaos / viral punchlines; low = dry gossip/politics talking-head. Dominates at cold-start, fades as live analytics accumulate. Paired with (a) humor-weighted moment selection — lib/clip-moment-selector.js, CLIP_HUMOR_TARGETING picks the FUNNY moment not just the loudest, and (b) smart-reframe active-speaker crop that makes talking-comedy clips look pro.",
     "brainrotScores": {
-      "IShowSpeed": 96, "KaiCenat": 92, "MrBeast": 90, "MoistCr1TiKaL": 86,
-      "KillTony": 84, "TheoVon": 76, "ClubShayShay": 52, "callherdaddy": 48, "PBDPodcast": 42
+      "IShowSpeed": 96, "AdinRoss": 94, "KaiCenat": 92, "MoistCr1TiKaL": 90,
+      "KillTony": 90, "MrBeast": 88, "TheoVon": 86, "ClubShayShay": 58, "callherdaddy": 48, "PBDPodcast": 42
     }
   }
 }
