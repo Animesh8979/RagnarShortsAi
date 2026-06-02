@@ -89,6 +89,31 @@ function chunk(values, size) {
   return chunks;
 }
 
+// L114 step D — reward = retention (AVP = whole-video % viewed) blended with
+// engagement weighted toward DISTRIBUTION signals (shares >> comments > likes).
+function computeReward({ avp, views, likes, comments, shares }) {
+  const avpScore = Math.max(0, Math.min(1, (Number(avp) || 0) / 100));
+  const v = Math.max(1, Number(views) || 0);
+  const engRate = ((Number(likes) || 0) + 2 * (Number(comments) || 0) + 3 * (Number(shares) || 0)) / v;
+  const engScore = Math.max(0, Math.min(1, engRate * 40));
+  return Math.round((0.6 * avpScore + 0.4 * engScore) * 1000) / 1000;
+}
+
+// Feed each video's reward into the bandit — closes the measure→learn loop. It's
+// a no-op until variant-bandit.pickArms is wired into the render path keyed by the
+// uploaded videoId; the reward field is written to the metrics file either way.
+function feedBanditFromAnalytics(records) {
+  let bandit;
+  try { bandit = require('./lib/variant-bandit'); } catch (_) { return; }
+  let fed = 0;
+  for (const r of records) {
+    if (r.reward == null || !r.videoId) continue;
+    const res = bandit.recordOutcome(r.videoId, r.reward);
+    if (res && res.ok) fed++;
+  }
+  if (fed) console.log(`Fed ${fed} bandit outcome(s) from analytics.`);
+}
+
 async function refreshYoutubeAnalytics() {
   ensureDir(LEDGER_DIR);
   const uploadedVideos = collectUploadedYoutubeVideos();
@@ -110,7 +135,7 @@ async function refreshYoutubeAnalytics() {
       ids: 'channel==MINE',
       startDate: '2026-01-01',
       endDate: new Date().toISOString().slice(0, 10),
-      metrics: 'views,likes,comments,averageViewDuration,averageViewPercentage',
+      metrics: 'views,likes,comments,averageViewDuration,averageViewPercentage,shares',
       dimensions: 'video',
       filters: `video==${allIds}`,
       maxResults: uploadedVideos.length,
@@ -128,6 +153,7 @@ async function refreshYoutubeAnalytics() {
         comments: Number(row[3]) || 0,
         averageViewDuration: Number(row[4]) || 0,
         averageViewPercentage: Number(row[5]) || 0,
+        shares: Number(row[6]) || 0, // L114 step D — top distribution signal
       });
     });
   } catch (error) {
@@ -143,8 +169,14 @@ async function refreshYoutubeAnalytics() {
     const items = Array.isArray(response.data.items) ? response.data.items : [];
     for (const item of items) {
       const ledgerMatch = uploadedVideos.find((video) => video.videoId === item.id);
+      const a = analyticsRowsByVideoId.get(item.id) || {};
+      const vws = item.statistics && item.statistics.viewCount ? Number(item.statistics.viewCount) : 0;
+      // L114 step D — the reward signal the bandit/Hook-Lab optimize toward.
+      const reward = computeReward({ avp: a.averageViewPercentage, views: vws, likes: a.likes, comments: a.comments, shares: a.shares });
       records.push({
         videoId: item.id,
+        shares: a.shares != null ? a.shares : null,
+        reward,
         title: item.snippet && item.snippet.title ? item.snippet.title : (ledgerMatch ? ledgerMatch.metadataTitle : null),
         publishedAt: item.snippet && item.snippet.publishedAt ? item.snippet.publishedAt : null,
         duration: item.contentDetails && item.contentDetails.duration ? item.contentDetails.duration : null,
@@ -166,6 +198,8 @@ async function refreshYoutubeAnalytics() {
     count: records.length,
     records,
   }, null, 2));
+
+  try { feedBanditFromAnalytics(records); } catch (error) { console.log(`Bandit feed skipped: ${error.message}`); }
 
   try {
     optimizeUploadSlots();
