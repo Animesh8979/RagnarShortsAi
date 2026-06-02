@@ -756,6 +756,23 @@ function ProgressBar() {
   return <div style={{ position: 'absolute', top: 0, left: 0, height: 8, width: `${pct}%`, background: `linear-gradient(90deg, ${RED}, ${AMBER}, ${CYAN})`, boxShadow: `0 0 18px ${AMBER}88` }} />;
 }
 
+// L114 — cinematic atmosphere/grade overlay: film grain (animated feTurbulence) +
+// vignette + teal-orange split-tone. The single highest-impact lift from "flat"
+// toward "graded/cinematic" without restructuring scenes.
+function Atmosphere() {
+  const frame = useCurrentFrame();
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      <AbsoluteFill style={{ background: 'radial-gradient(125% 105% at 50% 42%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.62) 100%)' }} />
+      <AbsoluteFill style={{ background: 'linear-gradient(180deg, rgba(30,60,110,0.14) 0%, rgba(0,0,0,0) 45%, rgba(120,65,20,0.16) 100%)', mixBlendMode: 'soft-light' }} />
+      <svg width="1080" height="1920" style={{ position: 'absolute', inset: 0, opacity: 0.08, mixBlendMode: 'overlay' }}>
+        <filter id="filmgrain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed={frame % 100} stitchTiles="stitch" /></filter>
+        <rect width="100%" height="100%" filter="url(#filmgrain)" />
+      </svg>
+    </AbsoluteFill>
+  );
+}
+
 export const V9StoryMotionComposition = ({
   scriptId = 'demo',
   audioFile = null,
@@ -778,6 +795,7 @@ export const V9StoryMotionComposition = ({
           </Sequence>
         );
       })}
+      <Atmosphere />
       <ProgressBar />
       <Captions wordBoundaries={wordBoundaries} powerWords={powerWords} />
       {audioFile ? <Audio src={staticFile(audioFile)} /> : null}
