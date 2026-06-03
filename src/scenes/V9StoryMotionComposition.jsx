@@ -723,9 +723,11 @@ function Captions({ wordBoundaries = [], powerWords = [] }) {
   const powerSet = new Set(powerWords.map((w) => String(w).toLowerCase().replace(/[^a-z0-9]/g, '')));
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
-      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: '14%', background: 'linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.76) 48%, rgba(0,0,0,0.18) 100%)' }} />
+      {/* feathered cinematic lower-third wash (no hard band, no caption box — premium type instead) */}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '44%', height: '26%', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 34%, rgba(0,0,0,0.58) 60%, rgba(0,0,0,0.26) 86%, rgba(0,0,0,0) 100%)' }} />
       <div style={{ position: 'absolute', top: 990, left: 0, right: 0, textAlign: 'center', padding: '0 42px', transform: `translateY(${y}px) scale(${scale})` }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 28, maxWidth: 990, padding: '10px 24px 16px', borderRadius: 18, background: 'rgba(0,0,0,0.58)', boxShadow: '0 10px 36px rgba(0,0,0,0.45)', whiteSpace: 'nowrap', overflow: 'visible' }}>
+        {/* premium gradient-glass pill: keeps contrast on bright footage, reads as designed (not a flat black box) */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 26, maxWidth: 1000, padding: '8px 28px 12px', borderRadius: 14, background: 'linear-gradient(180deg, rgba(10,14,22,0.30), rgba(10,14,22,0.58))', boxShadow: '0 6px 26px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.12)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', whiteSpace: 'nowrap', overflow: 'visible' }}>
           {active.words.map((word, index) => {
             const activeWord = tSec >= word.startSeconds && tSec < word.startSeconds + Math.max(0.12, word.durationSeconds || 0.16) + 0.04;
             const cleaned = cleanWord(word.word).toUpperCase();
