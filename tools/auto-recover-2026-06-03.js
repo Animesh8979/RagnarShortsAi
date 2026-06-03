@@ -30,8 +30,8 @@ async function netStable() {
 
 function runBatch() {
   return new Promise((resolve) => {
-    log('network stable → launching full batch (organic 2 + clips 2, auto-upload, gap 0)');
-    const child = spawn(process.execPath, ['lib/daily-fresh-batch.js', '--organic', '2', '--clips', '2', '--auto-upload', '--upload-gap-min', '0'], {
+    log('network stable → launching ORGANIC-ONLY recovery (clips already live; organic 2, auto-upload, gap 0)');
+    const child = spawn(process.execPath, ['lib/daily-fresh-batch.js', '--organic', '2', '--clips', '0', '--auto-upload', '--upload-gap-min', '0'], {
       cwd: ROOT,
       env: { ...process.env, ORGANIC_STORY: '1', L110_WHISPER_LOCAL: '1', L110_MOMENT_SELECTOR: '1', CLIP_HUMOR_TARGETING: '1', RENDER_QA_MIN: '60' },
       stdio: ['ignore', fs.openSync(LOG, 'a'), fs.openSync(LOG, 'a')],
