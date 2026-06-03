@@ -336,7 +336,7 @@ function EvidenceBoard({ beat }) {
 //    region auto-zoomed, with an animated strike/route arc + travelling pulse. ─
 function projLonLat(lon, lat, W, H) { return { x: (lon + 180) / 360 * W, y: (90 - lat) / 180 * H }; }
 
-function RealMapScene({ beat, durationInFrames }) {
+function RealMapScene({ beat, heroClip, durationInFrames }) {
   const frame = useCurrentFrame();
   const { fps, width: W, height: H } = useVideoConfig();
   const places = Array.isArray(beat.places) ? beat.places : [];
@@ -359,8 +359,17 @@ function RealMapScene({ beat, durationInFrames }) {
   const arcD = `M ${a.x} ${a.y} Q ${midX} ${midY} ${b.x} ${b.y}`;
   return (
     <AbsoluteFill style={{ background: `radial-gradient(135% 95% at 50% 32%, #122044 0%, ${BG} 72%)` }}>
+      {/* L114 — blurred FLUX hero as a depth-of-field BACKGROUND plate: gives real
+          foreground/background depth + atmosphere + fills the dead vertical space
+          (the QA gate's top complaints). The map/arc/pins sit in the foreground. */}
+      {heroClip ? (
+        <AbsoluteFill style={{ opacity: 0.6, transform: `scale(${(1.12 + interpolate(frame, [0, durationInFrames || 90], [0, 0.09], { extrapolateRight: 'clamp' })).toFixed(3)})` }}>
+          <OffthreadVideo src={staticFile(heroClip)} muted style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(18px) brightness(0.40) saturate(1.25)' }} />
+        </AbsoluteFill>
+      ) : null}
+      <AbsoluteFill style={{ background: 'radial-gradient(60% 42% at 50% 30%, rgba(41,211,255,0.14), rgba(0,0,0,0) 62%)' }} />
       <svg width={W} height={H} style={{ position: 'absolute', inset: 0 }}>
-        <defs><filter id="v9MapGlow"><feGaussianBlur stdDeviation="6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter></defs>
+        <defs><filter id="v9MapGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="11" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter></defs>
         {Array.from({ length: 13 }).map((_, i) => <line key={'v' + i} x1={i * W / 12} y1={0} x2={i * W / 12} y2={H} stroke={LINE} strokeWidth={1} />)}
         {Array.from({ length: 22 }).map((_, i) => <line key={'h' + i} x1={0} y1={i * H / 21} x2={W} y2={i * H / 21} stroke={LINE} strokeWidth={1} />)}
         {sp.length >= 2 && (
@@ -505,7 +514,7 @@ function StoryScene({ beat, heroClip, durationInFrames, wordBoundaries, beatStar
   if (mod === 'presenter_brief') return <PresenterScene beat={b} wordBoundaries={wordBoundaries} durationInFrames={durationInFrames} beatStartSec={beatStartSec} />;
   if (mod === 'leader_portrait') return <LeaderPortraitScene beat={b} heroClip={heroClip} durationInFrames={durationInFrames} />;
   if ((mod === 'crisis_map' || mod === 'route_strike_board' || mod === 'radar_intercept') && Array.isArray(b.places) && b.places.length) {
-    return <RealMapScene beat={b} durationInFrames={durationInFrames} />;
+    return <RealMapScene beat={b} heroClip={heroClip} durationInFrames={durationInFrames} />;
   }
   return <EvidenceScene beat={b} heroClip={heroClip} durationInFrames={durationInFrames} />;
 }
