@@ -30,6 +30,16 @@ async function netStable() {
 
 function runBatch() {
   return new Promise((resolve) => {
+    // L114 — reset circuit breakers before launching: their failures were caused by
+    // the (now-resolved) network outage, and a stuck-open breaker makes script-gen
+    // fail with "no_provider_available attempts=[]" → 0/0 even after the net is back.
+    try {
+      const bf = path.join(ROOT, 'renders', 'analytics', 'circuit-breakers.json');
+      const bj = JSON.parse(fs.readFileSync(bf, 'utf8'));
+      for (const k of Object.keys(bj)) { const v = bj[k]; v.failures = 0; v.consecutiveFailures = 0; v.count = 0; v.openUntil = 0; v.openedUntil = 0; v.cooldownUntil = 0; v.nextTry = 0; v.state = 'closed'; }
+      fs.writeFileSync(bf, JSON.stringify(bj, null, 2));
+      log('circuit breakers reset (outage failures cleared) before launch');
+    } catch (e) { log('breaker reset skipped: ' + e.message); }
     log('network stable → launching ORGANIC-ONLY recovery (clips already live; organic 2, auto-upload, gap 0)');
     const child = spawn(process.execPath, ['lib/daily-fresh-batch.js', '--organic', '2', '--clips', '0', '--auto-upload', '--upload-gap-min', '0'], {
       cwd: ROOT,
