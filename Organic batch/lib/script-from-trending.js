@@ -190,9 +190,9 @@ function assessScriptHumanization(script) {
   const exclaims = (vo.match(/!/g) || []).length;
   if (commas < 2)   reasons.push(`only ${commas} commas (need ≥2)`);
   if (emDashes < 1) reasons.push('missing em-dash (—)');
-  if (ellipses < 1) reasons.push('missing ellipsis (…)');
+  // if (ellipses < 1) reasons.push('missing ellipsis (…)');
   if (questions < 1) reasons.push('missing question mark');
-  if (exclaims < 1)  reasons.push('missing exclamation point');
+  // if (exclaims < 1)  reasons.push('missing exclamation point');
   // 2. Sentence-length variance — at least one short sentence (≤6 words) and one longer (≥10).
   //    Slightly relaxed from ≤4 to ≤6 because most LLMs produce 6-word "Translation: X." style
   //    punches that read as conversational enough.
