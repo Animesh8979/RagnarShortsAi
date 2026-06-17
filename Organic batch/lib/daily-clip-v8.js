@@ -1,0 +1,322 @@
+/**
+ * lib/daily-clip-v8.js — MASTER-REBUILD clipping pipeline (Phase 4 + 8)
+ *
+ * Builds reactive split-screen clips from the MrBeast 100 Pilots HD source.
+ *   1. Extract 25-30s A-roll segments at chosen timestamps
+ *   2. Extract audio from each segment
+ *   3. Build word-level captions via Groq Whisper (allowed for clips, NOT organic)
+ *   4. Run split-screen.compose() with Subway Surfers b-roll (NEW filtergraph:
+ *      blurred-fill + adaptive EQ + unsharp on A-roll only, b-roll untouched)
+ *   5. Mux audio at 48kHz stereo
+ *   6. Build IG variant
+ *
+ * Channel routing: B1 + B2 → RagnarShortsUltimate + IG (vid1).
+ */
+'use strict';
+
+require('./env-d-drive-only');  // dotenv override + force ALL caches/temp to D:\ (no C: writes)
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+
+const ROOT = path.resolve(__dirname, '..');
+const FFMPEG = (() => { try { return require('ffmpeg-static'); } catch (_) { return 'ffmpeg'; } })();
+const FFPROBE = (() => { try { return require('ffprobe-static').path; } catch (_) { return 'ffprobe'; } })();
+
+const splitScreen = require('./split-screen');
+const captionBuilder = require('./caption-builder');
+
+function ensureDir(d) { try { fs.mkdirSync(d, { recursive: true }); } catch (_) {} }
+function rel(p) { return path.relative(process.cwd(), p).replace(/\\/g, '/'); }
+
+// Actual media duration in seconds (ffprobe first, ffmpeg -i stderr fallback).
+function probeDurSec(p) {
+  try {
+    const r = spawnSync(FFPROBE, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', p], { encoding: 'utf8' });
+    const v = parseFloat(String(r.stdout || '').trim());
+    if (v > 0) return v;
+  } catch (_) {}
+  const r = spawnSync(FFMPEG, ['-i', p], { encoding: 'utf8' });
+  const m = /Duration:\s*(\d+):(\d+):([\d.]+)/.exec(r.stderr || '');
+  return m ? (Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])) : 0;
+}
+
+const CLIPS = [
+  {
+    id: 'B1',
+    label: 'clip-B1-100pilots-emotional',
+    sourceVideo: path.join(ROOT, '.runtime-cache/clip-sources/mrbeast-100pilots/100pilots-source.mp4'),
+    startSec: 55,                  // "I DID IT FOR MY DAUGHTERS" emotional moment
+    durationSec: 28,
+    brollFile: 'subwaysurfers.mp4',
+    outDir: path.join(ROOT, 'renders/creator-clips-v2/2026-05-21-B1'),
+  },
+  {
+    id: 'B2',
+    label: 'clip-B2-100pilots-finalrounds',
+    sourceVideo: path.join(ROOT, '.runtime-cache/clip-sources/mrbeast-100pilots/100pilots-source.mp4'),
+    startSec: 1432,                // Final rounds exhaustion / elimination drama
+    durationSec: 28,
+    brollFile: 'subwaysurfers.mp4',
+    outDir: path.join(ROOT, 'renders/creator-clips-v2/2026-05-21-B2'),
+  },
+];
+
+async function processClip(clip) {
+  ensureDir(clip.outDir);
+  const slug = path.basename(clip.outDir);
+  console.log('\n=== ' + clip.id + ' (' + clip.label + ') ===');
+  console.log('  Source: ' + path.basename(clip.sourceVideo));
+  console.log('  Cut:    ' + clip.startSec + 's → +' + clip.durationSec + 's');
+
+  // 1. Extract A-roll segment OR cut-and-stack multi-cut composition.
+  //    L109 P1 — when L109_CUT_ON_PEAK=1, use peak-detector + multi-cut + SFX
+  //    overlay for EVERY clip (not just horror). 8-14 cuts per 28s + whoosh
+  //    on each cut + vine-boom on top-3 peaks. The multi-cut video becomes
+  //    the A-roll, then feeds the clip's compose mode (full_frame_horror →
+  //    full-frame; split_screen → multi-cut top half + b-roll bottom).
+  //    This is the fix for "clips are just zoom/single-shot" — now every clip
+  //    has real cut rhythm regardless of source type (horror, podcast, etc).
+  const arollPath = path.join(clip.outDir, slug + '-aroll.mp4');
+  let arollMethod = 'single-shot';
+  let cutAndStackResult = null;
+  if (process.env.L109_CUT_ON_PEAK === '1') {
+    try {
+      const cutStack = require('./cut-and-stack');
+      console.log('  → L109 cut-on-peak: detecting peaks in source...');
+      // We feed the full source video, target the clip durationSec.
+      // The cut-and-stack module will scan peaks across the entire source
+      // and pick the best 8-14 from the START_SEC..START_SEC+windowSec window.
+      // To make this work with the existing flow, we first extract a wider
+      // window (3x duration) around the planned cut, then cut-and-stack
+      // peaks within that.
+      const widePath = path.join(clip.outDir, slug + '-wide-source.mp4');
+      const windowSec = Math.min(clip.durationSec * 6, 240); // 6x duration or 4 min max
+      const wideStart = Math.max(0, clip.startSec - clip.durationSec * 2);
+      const widR = spawnSync(FFMPEG, [
+        '-y', '-ss', String(wideStart), '-i', rel(clip.sourceVideo),
+        '-t', String(windowSec),
+        '-c', 'copy',
+        rel(widePath),
+      ], { encoding: 'utf8' });
+      if (widR.status === 0 && fs.existsSync(widePath)) {
+        cutAndStackResult = await cutStack.cutAndStack({
+          sourcePath: widePath,
+          outputPath: arollPath,
+          targetDurSec: clip.durationSec,
+          thresholdDb: -25,
+          mode: clip.mode || 'split_screen',   // drives cut density: podcast=gentle, horror=rapid
+          isHorror: !!clip.isHorror,
+        });
+        if (cutAndStackResult.ok) {
+          // L109+ coherence gate — verify the multi-cut actually produced real
+          // visual variety. If too static/incoherent, discard and single-shot.
+          const coh = cutStack.measureCoherence(arollPath, cutAndStackResult.cuts.length);
+          if (coh.verdict === 'reject') {
+            console.log('  ⚠ coherence gate REJECT: ' + coh.reason + ' — falling back to single-shot');
+            try { fs.unlinkSync(arollPath); } catch (_) {}
+            try { fs.unlinkSync(widePath); } catch (_) {}
+            // arollMethod stays 'single-shot' → fallback block runs below
+          } else {
+            arollMethod = `cut-and-stack (${cutAndStackResult.cuts.length} cuts, ${cutAndStackResult.sfxOverlays.length} SFX, ${coh.sceneChanges} scene-changes, ${coh.verdict})`;
+            try { fs.unlinkSync(widePath); } catch (_) {}
+          }
+        } else {
+          console.log('  ⚠ cut-and-stack failed: ' + cutAndStackResult.reason + ' — falling back to single-shot');
+        }
+      } else {
+        console.log('  ⚠ wide-window extract failed — falling back to single-shot');
+      }
+    } catch (e) {
+      console.log('  ⚠ cut-and-stack threw: ' + (e && e.message || e).slice(0, 120) + ' — single-shot fallback');
+    }
+  }
+
+  // Single-shot fallback (or default when cut-on-peak disabled / non-horror)
+  if (arollMethod === 'single-shot') {
+    const arollR = spawnSync(FFMPEG, [
+      '-y', '-ss', String(clip.startSec), '-i', rel(clip.sourceVideo),
+      '-t', String(clip.durationSec),
+      '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'medium', '-b:v', '6M',
+      '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
+      '-movflags', '+faststart',
+      rel(arollPath),
+    ], { encoding: 'utf8' });
+    if (arollR.status !== 0 || !fs.existsSync(arollPath)) {
+      return { ok: false, reason: 'aroll_extract_failed', stderr: (arollR.stderr || '').slice(-600) };
+    }
+  }
+  console.log('  A-roll extracted (' + arollMethod + '): ' + fs.statSync(arollPath).size + ' bytes');
+
+  // ── L110 DEAD-TAIL FIX ──────────────────────────────────────────────────
+  // cut-and-stack (cut-on-peak) removes dead air, so the a-roll it produces is
+  // routinely SHORTER than the requested clip.durationSec (e.g. 28s asked → 22s
+  // actual). Audio + captions both derive from the a-roll, but split-screen was
+  // still told the old 28s — so the gameplay b-roll padded 6s past where the clip
+  // and captions end, producing a caption-less, audio-less "dead tail" that makes
+  // the video look broken. Re-sync durationSec to the a-roll's ACTUAL length so the
+  // composite, audio, captions, and output all end together.
+  const arollActualDur = probeDurSec(arollPath);
+  if (arollActualDur > 1 && Math.abs(arollActualDur - clip.durationSec) > 0.25) {
+    console.log('  ⏱ a-roll actual ' + arollActualDur.toFixed(2) + 's vs requested ' + clip.durationSec + 's → re-syncing downstream to actual (kills dead tail)');
+    clip.durationSec = Number(arollActualDur.toFixed(2));
+  }
+
+  // 2. Extract audio
+  const audioPath = path.join(clip.outDir, slug + '-audio.m4a');
+  const audR = spawnSync(FFMPEG, [
+    '-y', '-i', rel(arollPath),
+    '-vn', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
+    rel(audioPath),
+  ], { encoding: 'utf8' });
+  if (audR.status !== 0 || !fs.existsSync(audioPath)) {
+    return { ok: false, reason: 'audio_extract_failed' };
+  }
+
+  // 3. Build word-level captions via Groq Whisper (clips path — allowed)
+  const captionsAssPath = path.join(clip.outDir, slug + '-captions.ass');
+  let captionsR;
+  try {
+    captionsR = await captionBuilder.buildFromWhisper({
+      audioPath, outputPath: captionsAssPath,
+      powerWords: ['daughters', 'jet', 'pilots', 'million', 'private', 'mrbeast', 'won', 'lose', 'first'],
+    });
+  } catch (e) {
+    captionsR = { ok: false, reason: 'whisper_threw:' + (e && e.message || e) };
+  }
+  if (!captionsR || !captionsR.ok) {
+    console.log('  ⚠ Whisper captions failed: ' + (captionsR && captionsR.reason));
+    console.log('  → continuing without captions');
+  } else {
+    console.log('  Captions: ' + captionsR.lineCount + ' lines');
+  }
+
+  // L110 T1.3 — reaction-commentary caption (the editorial/transformative
+  // layer). Generate a content-aware hot-take and append it to the ASS as a
+  // distinct top-third style, shown ~0.6-3.6s (over the hook window).
+  let reactionText = null;
+  if (captionsR && captionsR.ok && process.env.SKIP_REACTION_CAPTION !== '1') {
+    try {
+      const rc = require('./reaction-caption');
+      const r = await rc.generateReaction({
+        sourceCreator: clip.sourceCreator, sourceTitle: clip.sourceTitle, sourceUrl: clip.sourceUrl,
+        startSec: clip.startSec, durationSec: clip.durationSec,
+      });
+      if (r.ok) {
+        reactionText = r.reaction;
+        const line = rc.buildReactionAssLine(r.reaction, 0.6, 3.6);
+        fs.appendFileSync(captionsAssPath, '\n' + line + '\n');
+        console.log('  💬 reaction caption (' + r.type + '): "' + r.reaction + '"');
+      }
+    } catch (e) { console.log('  reaction caption skipped: ' + (e && e.message || e).slice(0, 80)); }
+  }
+
+  // 4. Probe A-roll YAVG for adaptive EQ
+  const yavg = splitScreen.probeArollYavg(arollPath);
+  console.log('  A-roll YAVG: ' + yavg + ' → lightingScore: ' + splitScreen.scoreLighting(yavg));
+
+  // 5. Compose (NEW filtergraph: blurred-fill + adaptive EQ + unsharp + brain-rot grade).
+  // L107+ — clip.mode flows through: 'full_frame_horror' for IShowSpeed horror VODs,
+  // 'split_screen' (default legacy) for everything else.
+  const clipMode = clip.mode || 'split_screen';
+  const splitOutPath = path.join(clip.outDir, slug + '-' + (clipMode === 'full_frame_horror' ? 'horror' : 'split') + '.mp4');
+  const compose = await splitScreen.compose({
+    topVideoPath: arollPath,
+    audioPath,
+    outputPath: splitOutPath,
+    durationSec: clip.durationSec,
+    brollFile: clip.brollFile,
+    mode: clipMode,
+    splitRatio: clip.splitRatio,
+    arollYavg: yavg,
+    captionsAssPath: (captionsR && captionsR.ok) ? captionsAssPath : undefined,
+  });
+  if (!compose.ok) {
+    return { ok: false, reason: 'compose_failed:' + compose.reason, stderr: compose.stderr, mode: clipMode };
+  }
+  console.log('  Render (' + clipMode + '): ' + fs.statSync(splitOutPath).size + ' bytes' + (compose.brollUsed ? ' broll=' + compose.brollUsed + ' @' + compose.brollOffset + 's' : ' (no b-roll)'));
+
+  // 6. Final IG-compliant rename (already 48kHz stereo from compose)
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  const finalPath = path.join(clip.outDir, slug + '-' + dateStamp + '-V8.mp4');
+  fs.copyFileSync(splitOutPath, finalPath);
+
+  // L110 T1 — retention post-FX (first-frame muted hook + seamless loop).
+  // Hook text = the reaction tease if we have one, else the source moment.
+  try {
+    const postfx = require('./retention-postfx');
+    const hookText = reactionText || clip.sourceTitle || clip.label || '';
+    const fx = postfx.apply({ finalPath, hookText });
+    if (fx.applied && fx.applied.length) console.log('  retention-postfx: ' + fx.applied.join(' + ') + (fx.hook ? ' | hook="' + fx.hook + '"' : ''));
+  } catch (e) { console.log('  retention-postfx skipped: ' + (e && e.message || e).slice(0, 80)); }
+
+  // L114 — QA gate = the pipeline's "eyes". ALWAYS score + log; only BLOCK when
+  // RENDER_QA_ENFORCE=1 (default = observability, never a silent batch halt).
+  let qaResult = null;
+  try {
+    qaResult = await require('./render-qa').qa({ videoPath: finalPath, frames: 4 });
+    if (qaResult && qaResult.ok) {
+      console.log('  render-QA: ' + qaResult.score + '/100 (' + qaResult.verdict + ')' + (qaResult.summary ? ' — ' + qaResult.summary.slice(0, 80) : ''));
+      try {
+        const qd = path.resolve(__dirname, '..', 'renders', 'analytics');
+        fs.mkdirSync(qd, { recursive: true });
+        fs.appendFileSync(path.join(qd, 'render-qa-' + dateStamp + '.jsonl'),
+          JSON.stringify({ ts: new Date().toISOString(), clipId: clip.id, video: path.basename(finalPath), score: qaResult.score, verdict: qaResult.verdict, issues: qaResult.issues, summary: qaResult.summary }) + '\n');
+      } catch (_) {}
+      if (process.env.RENDER_QA_ENFORCE === '1' && qaResult.verdict === 'reject') {
+        return { ok: false, reason: 'render_qa_rejected:' + qaResult.score, qa: qaResult, outputPath: finalPath };
+      }
+    }
+  } catch (e) { console.log('  render-QA skipped: ' + (e && e.message || e).slice(0, 80)); }
+
+  const igPath = path.join(clip.outDir, slug + '-' + dateStamp + '-V8-instagram.mp4');
+  fs.copyFileSync(finalPath, igPath);
+  return {
+    ok: true,
+    id: clip.id,
+    qa: qaResult,
+    outputPath: finalPath,
+    igVariantPath: igPath,
+    sizeBytes: fs.statSync(finalPath).size,
+    yavg,
+    brollUsed: compose.brollUsed,
+    brollOffset: compose.brollOffset,
+    captionLines: captionsR && captionsR.ok ? captionsR.lineCount : 0,
+  };
+}
+
+async function main(clipList) {
+  const list = Array.isArray(clipList) && clipList.length ? clipList : CLIPS;
+  const results = [];
+  for (const clip of list) {
+    const r = await processClip(clip);
+    results.push(r);
+  }
+  return results;
+}
+
+/**
+ * processClips(specs) — render an arbitrary clip list (used by fresh-batch).
+ * Each spec: { id, label, sourceVideo, startSec, durationSec, brollFile, outDir }
+ */
+async function processClips(specs) {
+  return main(specs);
+}
+
+module.exports = { processClip, processClips, main, CLIPS };
+
+if (require.main === module) {
+  main().then((res) => {
+    console.log('\n=== V8 CLIPPING RESULTS ===');
+    for (const r of res) {
+      if (r.ok) {
+        console.log('✓ ' + r.id + ': ' + r.outputPath + ' (' + (r.sizeBytes / 1e6).toFixed(2) + ' MB, YAVG=' + r.yavg + ', b-roll=' + r.brollUsed + ')');
+      } else {
+        console.log('✗ ' + (r.id || 'clip') + ': ' + r.reason);
+        if (r.stderr) console.log('  stderr:', r.stderr.slice(0, 400));
+      }
+    }
+    process.exit(res.every((r) => r.ok) ? 0 : 1);
+  }).catch((e) => { console.error(e); process.exit(1); });
+}
