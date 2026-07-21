@@ -1,0 +1,46 @@
+{
+  "script": "This Signal Has NEVER Been Explained",
+  "totalDurationMs": 22285,
+  "totalDurationSec": 22.285,
+  "voice": "en-US-GuyNeural",
+  "segments": [
+    {
+      "index": 0,
+      "audioPath": "D:\\anitgravity work\\packages\\reports\\audio-wow-signal-v3\\segment_0.mp3",
+      "durationMs": 2612,
+      "offsetMs": 0
+    },
+    {
+      "index": 1,
+      "audioPath": "D:\\anitgravity work\\packages\\reports\\audio-wow-signal-v3\\segment_1.mp3",
+      "durationMs": 4075,
+      "offsetMs": 2612
+    },
+    {
+      "index": 2,
+      "audioPath": "D:\\anitgravity work\\packages\\reports\\audio-wow-signal-v3\\segment_2.mp3",
+      "durationMs": 5587,
+      "offsetMs": 6687
+    },
+    {
+      "index": 3,
+      "audioPath": "D:\\anitgravity work\\packages\\reports\\audio-wow-signal-v3\\segment_3.mp3",
+      "durationMs": 2837,
+      "offsetMs": 12274
+    },
+    {
+      "index": 4,
+      "audioPath": "D:\\anitgravity work\\packages\\reports\\audio-wow-signal-v3\\segment_4.mp3",
+      "durationMs": 4487,
+      "offsetMs": 15111
+    },
+    {
+      "index": 5,
+      "audioPath": "D:\\anitgravity work\\packages\\reports\\audio-wow-signal-v3\\segment_5.mp3",
+      "durationMs": 2687,
+      "offsetMs": 19598
+    }
+  ],
+  "captionsPath": "D:\\anitgravity work\\packages\\reports\\audio-wow-signal-v3\\captions.json",
+  "srtPath": "D:\\anitgravity work\\packages\\reports\\audio-wow-signal-v3\\captions.srt"
+}

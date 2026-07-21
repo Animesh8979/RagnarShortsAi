@@ -1,0 +1,22 @@
+{
+  "name": "@antigravity/skills-video-watch",
+  "version": "1.0.0",
+  "description": "Video Watch skill: Auto-QA for rendered videos using ffprobe",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "watch": "node dist/index.js watch"
+  },
+  "dependencies": {
+    "@antigravity/config": "*",
+    "@antigravity/security": "*",
+    "@antigravity/utils": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}

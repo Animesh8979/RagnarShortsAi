@@ -1,0 +1,26 @@
+﻿[
+    {
+        "frame":  "frame_0001.png",
+        "verdict_raw":  "**Verdict:** AMATEUR\n\n**Axes:**\n\n*   **Character:** NOT OK - No character is present in the frame.\n*   **Text:** OK - The text \"THIS SIGNAL HAS NEVER BEEN EXPLAINED\" is legible against its background.\n*   **Composition:** NOT OK - The frame lacks balance and visual hierarchy. The text is centered at the top, leaving a large empty space below it.\n*   **Color:** OK - The color palette is cohesive and does not clash.\n*   **Visual Support:** NOT OK - There is no central subject or visual support element in the frame.\n*   **Artifacts:** OK - No rendering glitches, broken SVG, overlapping elements, misspelled words, or illegible markers are present.\n\n**Worst Issue:** The frame lacks a central subject or visual support element, making it unclear what the video is about.\n\n**Fix Suggestion:** Add a relevant visual element, such as an animation or graphic, to the center of the frame to support the text and provide context for the video."
+    },
+    {
+        "frame":  "frame_0002.png",
+        "verdict_raw":  "**Verdict:** AMATEUR\n\n**Axes:**\n\n*   **Character:** OK\n*   **Text:** OK\n*   **Composition:** OK\n*   **Color:** OK\n*   **Visual Support:** OK\n*   **Artifacts:** OK\n\n**Worst Issue:** The background is too dark and lacks visual interest, making it difficult to focus on the central subject.\n\n**Fix Suggestion:** Add more visual elements or textures to the background to create a more engaging and balanced composition."
+    },
+    {
+        "frame":  "frame_0003.png",
+        "verdict_raw":  "**Verdict:** AMATEUR\n\n**Axes:**\n\n*   **Character:** OK\n*   **Text:** OK\n*   **Composition:** OK\n*   **Color:** OK\n*   **Visual Support:** OK\n*   **Artifacts:** OK\n\n**Worst Issue:** The background is too dark and lacks visual interest, making it difficult to focus on the central subject.\n\n**Fix Suggestion:** Add more visual elements or textures to the background to create a more engaging and balanced composition."
+    },
+    {
+        "frame":  "frame_0004.png",
+        "verdict_raw":  "**Verdict:** AMATEUR\n\n**Axes:**\n\n*   **Character:** OK\n*   **Text:** OK\n*   **Composition:** OK\n*   **Color:** OK\n*   **Visual Support:** OK\n*   **Artifacts:** OK\n\n**Worst Issue:** The frame lacks a clear visual hierarchy, with the central subject (the archival SVG visualization) not standing out as the focal point.\n\n**Fix Suggestion:** Enhance the contrast and saturation of the central subject to make it more visually appealing and draw the viewer\u0027s attention."
+    },
+    {
+        "frame":  "frame_0005.png",
+        "verdict_raw":  "**Verdict:** AMATEUR\n\n**Axes:**\n\n*   **Character:** OK\n*   **Text:** OK\n*   **Composition:** The frame is not balanced. The text \"FOLLOW FOR MYSTERIES\" is centered but appears to be floating in dead space, and the red line at the bottom of the frame seems out of place. There is no clear visual hierarchy.\n*   **Color/Mood:** The palette is cohesive, with a dark blue background and lighter blue text. However, the use of a bright red line at the bottom of the frame may be jarring.\n*   **Visual Support:** The central subject (the red line) is not clearly the focal point. It appears to be an afterthought and does not serve the segment\u0027s beat.\n*   **Artifacts:** There are no rendering glitches, broken SVGs, overlapping elements, misspelled words, or illegible markers.\n\n**Worst Issue:** The composition of the frame is unbalanced and lacks a clear visual hierarchy.\n\n**Fix Suggestion:** Rearrange the elements in the frame to create a more balanced composition. Consider adding more context or visual interest to the central subject (the red line) to make it more engaging and relevant to the segment\u0027s beat."
+    },
+    {
+        "frame":  "frame_0006.png",
+        "verdict_raw":  "**Verdict:** AMATEUR\n\n**Axes:**\n\n*   **Character:** NOT OK - No character is present in the frame.\n*   **Text:** NOT OK - The text \"THIS SIGNAL HAS NEVER BEEN EXPLAINED\" is legible but lacks visual hierarchy and balance within the composition. Exact text seen: \"THIS SIGNAL HAS NEVER BEEN EXPLAINED\".\n*   **Composition:** NOT OK - The frame lacks balance, with too much dead space and no clear visual hierarchy. The central subject (the signal visualization) is not clearly the focal point.\n*   **Color/Mood:** OK - The color palette is cohesive and does not clash.\n*   **Visual Support:** NOT OK - The central subject (the signal visualization) is not crisp, framed, or serving the segment\u0027s beat.\n*   **Artifacts:** OK - No rendering glitches, broken SVG, overlapping elements, misspelled words, or illegible markers are present.\n\n**Worst Issue:** The lack of a clear visual hierarchy and balance in the composition, making it difficult to focus on the central subject.\n\n**Fix Suggestion:** Add a professional animated human character and re-compose the frame to create a clear visual hierarchy, balancing the elements and ensuring the central subject is the focal point."
+    }
+]

@@ -1,0 +1,24 @@
+{
+  "name": "@antigravity/sk-video-vision",
+  "version": "1.0.0",
+  "description": "Non-ffmpeg video-vision MCP — OpenCV frame extraction + NVIDIA vision analysis",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo 'No tests yet'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.5.0",
+    "axios": "^1.7.0",
+    "zod": "^4.3.6",
+    "@antigravity/config": "*",
+    "@antigravity/security": "*",
+    "@antigravity/utils": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}

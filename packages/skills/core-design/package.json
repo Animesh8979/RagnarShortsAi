@@ -1,0 +1,14 @@
+{
+    "main": "src/index.ts",
+    "name": "@antigravity/core-design",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "build": "tsc"
+    },
+    "devDependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "@types/node": "^26.0.1",
+        "typescript": "^6.0.3"
+    }
+}

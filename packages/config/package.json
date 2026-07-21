@@ -1,0 +1,19 @@
+{
+  "name": "@antigravity/config",
+  "version": "1.0.0",
+  "description": "Typed environment variables and configuration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@antigravity/security": "*",
+    "@antigravity/types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

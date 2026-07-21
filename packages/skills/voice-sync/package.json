@@ -1,0 +1,16 @@
+{
+  "name": "@antigravity/skills-voice-sync",
+  "version": "1.0.0",
+  "description": "Voice Sync skill: TTS + caption generation for video narration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "node-edge-tts": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

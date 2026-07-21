@@ -1,0 +1,19 @@
+{
+  "name": "@antigravity/utils",
+  "version": "1.0.0",
+  "description": "Shared utilities: logging, file ops, path validation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@antigravity/security": "*",
+    "@antigravity/types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

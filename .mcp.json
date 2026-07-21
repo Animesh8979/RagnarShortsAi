@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "D:\\anitgravity work\\reports", "D:\\anitgravity work"]
+    },
+    "fetch": {
+      "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"]
+    },
+    "sequential-thinking": {
+      "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "memory": {
+      "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]
+    },
+    "brave-search": {
+      "command": "npx", "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": { "BRAVE_API_KEY": "${BRAVE_API_KEY}" }
+    },
+    "tavily": {
+      "command": "npx", "args": ["-y", "@mdp/tavily-mcp-server"],
+      "env": { "TAVILY_API_KEY": "${TAVILY_API_KEY}" }
+    },
+    "video-vision": {
+      "command": "npx", "args": ["-y", "@modelcontextprotocol/server-video-vision"]
+    }
+  }
+}

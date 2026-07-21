@@ -1,0 +1,20 @@
+{
+  "name": "@antigravity/media",
+  "version": "1.0.0",
+  "description": "Media processing: FFmpeg wrapper, video composition helpers",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@antigravity/security": "*",
+    "@antigravity/utils": "*",
+    "@antigravity/types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

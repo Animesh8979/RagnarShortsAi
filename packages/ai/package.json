@@ -1,0 +1,20 @@
+{
+  "name": "@antigravity/ai",
+  "version": "1.0.0",
+  "description": "AI provider abstractions: Ollama, free APIs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@antigravity/security": "*",
+    "@antigravity/utils": "*",
+    "@antigravity/types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

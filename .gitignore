@@ -1,25 +1,58 @@
+_v1-backup
+
+.runtime-cache
+playwright_browsers
+node_modules
+graphify-out
+reports
+
+# Environment secrets
 .env
-.env.*
-yt-credentials.json
-youtube_token.pickle
-node_modules/
-renders/
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
 build/
-output/
-.hf-cache/
-.runtime-cache/
 *.log
-temp-*.json
-temp_props*.json
-story-state.json
-queue.json
-queue.lock
-public-reels/
-public/audio/bgm-library/**/*.mp3
-public/audio/bgm-library/**/*.wav
-public/audio/sfx-library/**/*.mp3
-public/audio/sfx-library/**/*.wav
-public/audio/*.wav
-public/audio/*.mp3
-public/v12-cache/
-vendor/
+
+# IDE
+.vscode/
+.idea/
+
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+cache/
+
+# Nested separate projects (not part of this monorepo)
+openmontage/
+.nexa/
+
+# Generated renders & frames
+apps/studio/out/
+
+# Video perception output
+video-perception/out/
+
+# Compiled JS alongside TS source (skill packages)
+packages/skills/**/dist/
+
+# Package-local lockfiles (use root lockfile only)
+packages/**/package-lock.json
+packages/**/yarn.lock
+packages/**/pnpm-lock.yaml
+
+# Python virtual envs
+.venv/
+venv/
+
+# OS files
+*.swp
+*.swo
+
+# IDE
+.history/
